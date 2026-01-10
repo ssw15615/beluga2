@@ -17,7 +17,11 @@ webpush.setVapidDetails(
   VAPID_PRIVATE_KEY
 );
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // Store subscriptions in memory (for demo); use a DB for production
@@ -108,18 +112,24 @@ app.post('/api/notify', async (req, res) => {
   res.json({ sent });
 });
 
-app.listen(PORT, '0.0.0.0', async () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
+  console.log('Server is ready to accept requests');
   
-  // Start scrapers on server startup
-  try {
-    const { runScrapers } = await import('./scrapeSchedule.js');
-    console.log('Starting initial scrape...');
-    await runScrapers();
-    console.log('Initial scrape complete, scheduling hourly runs...');
-    setInterval(runScrapers, 60 * 60 * 1000);
-  } catch (e) {
-    console.error('Failed to start scrapers:', e.message);
-  }
+  // Start scrapers after a short delay to ensure server is fully up
+  setTimeout(async () => {
+    try {
+      const { runScrapers } = await import('./scrapeSchedule.js');
+      console.log('Starting initial scrape...');
+      await runScrapers();
+      console.log('Initial scrape complete, scheduling hourly runs...');
+      setInterval(async () => {
+        console.log('Running scheduled scrape...');
+        await runScrapers();
+      }, 60 * 60 * 1000);
+    } catch (e) {
+      console.error('Failed to start scrapers:', e);
+    }
+  }, 2000);
 });
