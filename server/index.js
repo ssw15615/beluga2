@@ -116,20 +116,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
   console.log('Server is ready to accept requests');
-  
-  // Start scrapers after a short delay to ensure server is fully up
-  setTimeout(async () => {
-    try {
-      const { runScrapers } = await import('./scrapeSchedule.js');
-      console.log('Starting initial scrape...');
-      await runScrapers();
-      console.log('Initial scrape complete, scheduling hourly runs...');
-      setInterval(async () => {
-        console.log('Running scheduled scrape...');
-        await runScrapers();
-      }, 60 * 60 * 1000);
-    } catch (e) {
-      console.error('Failed to start scrapers:', e);
-    }
-  }, 2000);
+  console.log('Use POST /api/scrape to trigger scraping manually');
 });
