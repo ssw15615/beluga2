@@ -169,33 +169,56 @@ export async function scrapeLocations() {
     
     const locations = {};
 
-    // Find all tables and parse the one with BelugaXL locations
-    $('table').each((tableIdx, table) => {
-      const rows = $(table).find('tr');
-      
-      rows.each((rowIdx, row) => {
-        const cells = $(row).find('td, th').map((_, td) => $(td).text().trim()).get();
-        
-        // Look for rows with BelugaXL identity (e.g., "BelugaXL-1")
-        if (cells.length >= 2) {
-          const identity = cells[0];
-          const match = identity.match(/BelugaXL-(\d+)/i);
-          
-          if (match) {
-            const xlNumber = match[1]; // e.g., "1"
-            const location = cells[1]; // e.g., "On the ground at Toulouse Blagnac Airport"
-            
-            locations[xlNumber] = location;
+    // Location block now uses flex rows under the "Where are the Belugas now?" heading
+    const locHeading = $('h2').filter((_, h) => $(h).text().trim().toLowerCase().includes('where are the belugas now'));
+    const locSection = locHeading.nextUntil('h2');
+
+    // Preferred: parse flex rows (two .flex-cell children: identity + location)
+    locSection.find('.flex-row').each((_, row) => {
+      const rowEl = $(row);
+      if (rowEl.hasClass('header')) return; // skip header row
+      const cells = rowEl.find('.flex-cell').map((__, cell) => $(cell).text().trim()).get();
+      if (cells.length < 2) return;
+      const match = String(cells[0]).match(/BelugaXL-(\d+)/i);
+      if (!match) return;
+      const xlNumber = match[1];
+      locations[xlNumber] = cells[1];
+    });
+
+    // Fallback: older table layout
+    if (Object.keys(locations).length === 0) {
+      const locTable = locHeading.nextAll('table').first();
+      if (locTable.length) {
+        locTable.find('tr').each((rowIdx, row) => {
+          const cells = $(row).find('td, th').map((_, td) => $(td).text().trim()).get();
+          if (cells.length >= 2) {
+            const match = String(cells[0]).match(/BelugaXL-(\d+)/i);
+            if (match) {
+              const xlNumber = match[1];
+              locations[xlNumber] = cells[1];
+            }
+          }
+        });
+
+        // Fallback for flattened table
+        if (Object.keys(locations).length === 0) {
+          const flatCells = locTable.find('td').map((_, td) => $(td).text().trim()).get();
+          for (let i = 0; i + 1 < flatCells.length; i += 2) {
+            const match = String(flatCells[i]).match(/BelugaXL-(\d+)/i);
+            if (match) {
+              const xlNumber = match[1];
+              locations[xlNumber] = flatCells[i + 1];
+            }
           }
         }
-      });
-    });
+      }
+    }
 
     if (Object.keys(locations).length > 0) {
       fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(locations, null, 2));
       console.log(`[scrapeLocations] Saved locations for ${Object.keys(locations).length} planes to ${LOCATIONS_FILE}`);
     } else {
-      console.log('[scrapeLocations] No location data found in tables');
+      console.log('[scrapeLocations] No location data found in tables or flex rows');
     }
   } catch (error) {
     console.error('[scrapeLocations] Error:', error.message);
