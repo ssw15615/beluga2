@@ -135,7 +135,7 @@ function App() {
     // Load theme from localStorage or default to dark
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
   })
-  const [scrapedData, setScrapedData] = useState<any>({ schedules: [] })
+  const [scrapedData, setScrapedData] = useState<any>({ schedules: [], locations: {} })
 
   // Fetch schedule and location data from backend
   useEffect(() => {
@@ -153,7 +153,7 @@ function App() {
         const locationsData = await locationsRes.json();
         console.log('Schedules:', schedules)
         console.log('Locations:', locationsData)
-        setScrapedData({ schedules, ...locationsData });
+        setScrapedData({ schedules, locations: locationsData });
       } catch (e) {
         console.error('Error fetching data:', e);
       }
@@ -176,7 +176,7 @@ function App() {
       ])
       const schedules = await scheduleRes.json()
       const locationsData = await locationsRes.json()
-      setScrapedData({ schedules, ...locationsData })
+      setScrapedData({ schedules, locations: locationsData })
     } catch (e) {
       console.error('Scrape failed:', e)
     }
