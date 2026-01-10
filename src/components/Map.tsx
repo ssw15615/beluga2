@@ -87,13 +87,28 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
       '5': 'F-GXLN', // XL-N
       '6': 'F-GXLO', // XL-O
     }
+
+    // Keyword matching for airport names (scraped text does not include ICAO codes)
+    const airportKeywords: Record<string, string[]> = {
+      'LFBO': ['toulouse', 'blagnac'],
+      'LFRS': ['nantes'],
+      'EGNR': ['hawarden', 'broughton'],
+      'LEZL': ['seville', 'sevilla'],
+      'LEMD': ['madrid'],
+      'LEBL': ['barcelona']
+    }
+    const keywords = (airportKeywords[airportCode] || []).map(k => k.toLowerCase())
     
     // Check if scrapedData exists and has locations before processing
     const locations = scrapedData?.locations || {}
     if (locations && typeof locations === 'object') {
       Object.entries(locations).forEach(([xlNum, location]: [string, any]) => {
         const reg = xlToReg[xlNum]
-        if (reg && typeof location === 'string' && location.toLowerCase().includes(airportCode.toLowerCase())) {
+        if (!reg || typeof location !== 'string') return
+        const loc = location.toLowerCase()
+        const matchesCode = loc.includes(airportCode.toLowerCase())
+        const matchesKeyword = keywords.some(k => loc.includes(k))
+        if (matchesCode || matchesKeyword) {
           planesAtAirport.push({ reg, xl: xlNum, location })
         }
       })
