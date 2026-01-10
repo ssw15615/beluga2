@@ -5,7 +5,7 @@ import bodyParser from 'body-parser';
 import fs from 'fs';
 
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 // Load or set your VAPID keys here
 const VAPID_PUBLIC_KEY = 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
@@ -39,7 +39,8 @@ app.get('/api/schedule', (req, res) => {
     const data = fs.readFileSync('./flightSchedule.json');
     res.json(JSON.parse(data));
   } catch (e) {
-    res.status(404).json({ error: 'No schedule data available' });
+    // Return an empty array instead of 404 so the frontend stays alive when no flights are present
+    res.json([]);
   }
 });
 
@@ -49,7 +50,8 @@ app.get('/api/locations', (req, res) => {
     const data = fs.readFileSync('./belugarLocations.json');
     res.json(JSON.parse(data));
   } catch (e) {
-    res.status(404).json({ error: 'No location data available' });
+    // Return an empty object instead of 404 when locations are missing
+    res.json({});
   }
 });
 
@@ -106,7 +108,18 @@ app.post('/api/notify', async (req, res) => {
   res.json({ sent });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
+  
+  // Start scrapers on server startup
+  try {
+    const { runScrapers } = await import('./scrapeSchedule.js');
+    console.log('Starting initial scrape...');
+    await runScrapers();
+    console.log('Initial scrape complete, scheduling hourly runs...');
+    setInterval(runScrapers, 60 * 60 * 1000);
+  } catch (e) {
+    console.error('Failed to start scrapers:', e.message);
+  }
 });
