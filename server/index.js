@@ -5,7 +5,7 @@ import bodyParser from 'body-parser';
 import fs from 'fs';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = 4000;
 
 // Load or set your VAPID keys here
 const VAPID_PUBLIC_KEY = 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
@@ -17,11 +17,7 @@ webpush.setVapidDetails(
   VAPID_PRIVATE_KEY
 );
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  credentials: true
-}));
+app.use(cors());
 app.use(bodyParser.json());
 
 // Store subscriptions in memory (for demo); use a DB for production
@@ -115,6 +111,4 @@ app.post('/api/notify', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
-  console.log('Server is ready to accept requests');
-  console.log('Use POST /api/scrape to trigger scraping manually');
 });
