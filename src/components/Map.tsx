@@ -89,11 +89,9 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
     }
     
     // Check if scrapedData exists and has locations before processing
-    if (scrapedData && typeof scrapedData === 'object') {
-      Object.entries(scrapedData).forEach(([xlNum, location]: [string, any]) => {
-        // Skip non-location properties like 'schedules'
-        if (xlNum === 'schedules' || typeof location !== 'string') return
-        
+    const locations = scrapedData?.locations || {}
+    if (locations && typeof locations === 'object') {
+      Object.entries(locations).forEach(([xlNum, location]: [string, any]) => {
         const reg = xlToReg[xlNum]
         if (reg && typeof location === 'string' && location.toLowerCase().includes(airportCode.toLowerCase())) {
           planesAtAirport.push({ reg, xl: xlNum, location })
