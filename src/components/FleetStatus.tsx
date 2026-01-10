@@ -20,7 +20,7 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
   const handlePlaneClick = (reg: string) => {
     const plane = activePlanes.find(p => p.reg === reg)
     const xlNum = getXlNum(reg)
-    const scrapedLocation = xlNum ? scrapedData[xlNum] : null
+    const scrapedLocation = xlNum ? scrapedData?.locations?.[xlNum] : null
 
     const planeData = plane ? {
       ...plane,
@@ -207,9 +207,9 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
             if (plane && (plane.dest_iata || plane.orig_iata)) {
               // Prefer destination if flying, else origin from FlightRadar24
               lastAirport = plane.dest_iata || plane.orig_iata
-            } else if (xlNum && scrapedData && scrapedData[xlNum]) {
+            } else if (xlNum && scrapedData?.locations?.[xlNum]) {
               // Use scraped location for inactive planes
-              lastAirport = scrapedData[xlNum]
+              lastAirport = scrapedData.locations[xlNum]
             }
             
             return (
