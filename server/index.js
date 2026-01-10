@@ -59,8 +59,22 @@ app.post('/api/scrape', async (req, res) => {
     const { scrapeSchedule, scrapeLocations } = await import('./scrapeSchedule.js');
     await scrapeSchedule();
     await scrapeLocations();
-    const schedule = JSON.parse(fs.readFileSync('./flightSchedule.json'));
-    const locations = JSON.parse(fs.readFileSync('./belugarLocations.json'));
+    
+    let schedule = [];
+    let locations = {};
+    
+    try {
+      schedule = JSON.parse(fs.readFileSync('./flightSchedule.json', 'utf-8'));
+    } catch (e) {
+      console.log('No flight schedule found');
+    }
+    
+    try {
+      locations = JSON.parse(fs.readFileSync('./belugarLocations.json', 'utf-8'));
+    } catch (e) {
+      console.log('No locations found');
+    }
+    
     res.json({ ok: true, flights: schedule.length, planes: Object.keys(locations).length });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || 'Scrape failed' });
