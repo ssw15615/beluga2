@@ -130,7 +130,7 @@ const clearHistoryCache = () => {
 function App() {
   usePushSubscription();
   const [planes, setPlanes] = useState([])
-  const [historyHours, setHistoryHours] = useState(3)
+  const [historyHours, setHistoryHours] = useState(48)
   const [historyData, setHistoryData] = useState<{ [reg: string]: any[] }>({})
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     // Load theme from localStorage or default to dark
@@ -191,12 +191,13 @@ function App() {
 
   useEffect(() => {
     fetchLiveData()
-    const interval = setInterval(fetchLiveData, 20000) // Update every 20s
+    const interval = setInterval(fetchLiveData, 60000) // Update every 60s (reduced from 20s)
     return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
-    fetchHistoryData()
+    // Don't auto-fetch history on mount to avoid rate limiting
+    // Users can manually trigger with the Scrape Now button
   }, [historyHours])
 
   // Expose clear cache function for debugging
@@ -257,62 +258,129 @@ function App() {
 
   const fetchHistoryData = async () => {
     const now = Math.floor(Date.now() / 1000)
-    // Round to 5-minute intervals for consistent cache keys
-    const roundedNow = Math.floor(now / 300) * 300
-    const interval = (historyHours * 3600) / 5 // 5 points
-    const timestamps = []
-    for (let i = 1; i <= 5; i++) {
-      timestamps.push(roundedNow - (i * interval))
-    }
     const newHistory: { [reg: string]: any[] } = {}
     
+    // Calculate time range
+    const timeBack = historyHours * 3600 // seconds
+    const startTime = now - timeBack
+    
+    console.log(`[fetchHistoryData] Fetching history for ${historyHours} hours (${new Date(startTime * 1000).toISOString()} to ${new Date(now * 1000).toISOString()})`)
+    
     for (const reg of BELUGA_REGISTRATIONS) {
-      const positions = []
-      for (const ts of timestamps) {
-        const cacheKey = getCacheKey(reg, ts)
+      const positions: any[] = []
+      
+      try {
+        const cacheKey = `fr24_history_all_${reg}_${Math.floor(startTime / 3600)}`
         let data = getCachedData(cacheKey)
         
         if (data) {
-          console.log(`Using cached data for ${reg} at ${ts}`)
+          console.log(`[fetchHistoryData] Using cached comprehensive data for ${reg} (${data.length} positions)`)
         } else {
-          console.log(`Fetching fresh data for ${reg} at ${ts}`)
+          console.log(`Fetching comprehensive historic data for ${reg} from ${new Date(startTime * 1000).toISOString()}`)
+          
+          // Fetch comprehensive historic data using the historic flight search
+          try {
+            const response = await fetch(
+              `https://fr24api.flightradar24.com/api/historic/flight-positions/full?registrations=${reg}&begin=${startTime}&end=${now}`,
+              {
+                headers: {
+                  'accept': 'application/json',
+                  'accept-version': 'v1',
+                  'authorization': `Bearer ${API_KEY}`
+                }
+              }
+            )
+            
+            if (response.status === 429) {
+              console.log(`[fetchHistoryData] Rate limited for ${reg}, using fallback method...`)
+              // Fallback: fetch snapshots at intervals
+              data = await fetchHistorySnapshots(reg, startTime, now)
+            } else if (response.ok) {
+              const responseData = await response.json()
+              data = responseData.data || []
+              console.log(`[fetchHistoryData] Fetched ${data.length} positions for ${reg}`)
+              if (data.length > 0) {
+                console.log(`[fetchHistoryData] Sample data for ${reg}:`, data[0])
+              }
+              setCachedData(cacheKey, data)
+            } else {
+              console.log(`[fetchHistoryData] Response status ${response.status} for ${reg}, using fallback...`)
+              data = await fetchHistorySnapshots(reg, startTime, now)
+            }
+            
+            // Increased delay to 1 second to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          } catch (error) {
+            console.error(`[fetchHistoryData] Error fetching comprehensive history for ${reg}:`, error)
+            // Fallback to snapshots
+            data = await fetchHistorySnapshots(reg, startTime, now)
+          }
         }
         
-        if (!data) {
-          // Data not in cache, fetch from API
-          try {
-            const response = await fetch(`https://fr24api.flightradar24.com/api/historic/flight-positions/full?registrations=${reg}&timestamp=${ts}`, {
+        if (data && Array.isArray(data) && data.length > 0) {
+          console.log(`[fetchHistoryData] Adding ${data.length} positions for ${reg}`)
+          positions.push(...data)
+        }
+      } catch (error) {
+        console.error(`[fetchHistoryData] Error processing history for ${reg}:`, error)
+      }
+      
+      console.log(`[fetchHistoryData] Total for ${reg}: ${positions.length} positions`)
+      newHistory[reg] = positions
+    }
+    console.log(`[fetchHistoryData] Complete. History data:`, newHistory)
+    setHistoryData(newHistory)
+  }
+
+  // Helper function to fetch snapshots at regular intervals (fallback)
+  const fetchHistorySnapshots = async (reg: string, startTime: number, endTime: number) => {
+    const positions: any[] = []
+    const interval = Math.max(3600, (endTime - startTime) / 6) // 6 snapshots (reduced from 12) or 1-hour intervals
+    const timestamps: number[] = []
+    
+    for (let ts = startTime; ts < endTime; ts += interval) {
+      timestamps.push(Math.floor(ts))
+    }
+    timestamps.push(endTime) // Add end time
+    
+    for (const ts of timestamps) {
+      const cacheKey = getCacheKey(reg, ts)
+      let data = getCachedData(cacheKey)
+      
+      if (!data) {
+        try {
+          const response = await fetch(
+            `https://fr24api.flightradar24.com/api/historic/flight-positions/full?registrations=${reg}&timestamp=${ts}`,
+            {
               headers: {
                 'accept': 'application/json',
                 'accept-version': 'v1',
                 'authorization': `Bearer ${API_KEY}`
               }
-            })
-            
-            if (response.status === 429) {
-              console.log(`Rate limited for ${reg} at ${ts}, skipping...`)
-              data = [] // Skip this request
-            } else {
-              const responseData = await response.json()
-              data = responseData.data || []
-              setCachedData(cacheKey, data) // Cache the result
             }
-            
-            // Add a small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200))
-          } catch (error) {
-            console.error(`Error fetching history for ${reg} at ${ts}:`, error)
-            data = [] // Use empty array on error
+          )
+          
+          if (response.status === 429) {
+            console.log(`Rate limited, stopping snapshot fetch`)
+            break
+          } else if (response.ok) {
+            const responseData = await response.json()
+            data = responseData.data || []
+            setCachedData(cacheKey, data)
           }
-        }
-        
-        if (data && data.length > 0) {
-          positions.push(...data)
+          
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Increased from 200ms to 2s
+        } catch (error) {
+          console.error(`Error fetching snapshot for ${reg} at ${ts}:`, error)
         }
       }
-      newHistory[reg] = positions
+      
+      if (data && Array.isArray(data) && data.length > 0) {
+        positions.push(...data)
+      }
     }
-    setHistoryData(newHistory)
+    
+    return positions
   }
 
   const closestPlane = planes.reduce((closest, plane) => {
