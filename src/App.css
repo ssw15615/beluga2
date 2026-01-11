@@ -756,25 +756,27 @@ body {
 
 .plane-photo-box {
   background-color: var(--bg-secondary);
-  border: none;           /* move border to image for exact fit */
+  border: none;
   border-radius: 6px;
-  padding: 0;            /* match photo size exactly */
-  margin: 0;             /* no extra space around photo */
-  display: inline-flex;  /* shrink-wrap around image */
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
-  min-height: unset;     /* no extra height beyond image */
-  line-height: 0;        /* prevent inline spacing above/below image */
+  height: fit-content;
+  width: fit-content;
+  line-height: 0;
 }
 
 .aircraft-photo {
   max-width: 100%;
   max-height: 250px;
   border-radius: 6px;
-  border: 0;             /* remove border to avoid extra thickness */
-  box-shadow: none;      /* remove shadow so edges match exactly */
+  border: 0;
+  box-shadow: none;
   object-fit: contain;
-  display: block;        /* avoid extra inline gaps */
+  display: block;
+  height: auto;
 }
 
 .plane-status-badge .status {
@@ -1015,3 +1017,111 @@ body {
 .plane-icon.rotate-330 { transform: rotate(330deg); }
 .plane-icon.rotate-340 { transform: rotate(340deg); }
 .plane-icon.rotate-350 { transform: rotate(350deg); }
+
+/* Historic Flights Styles */
+.historic-flights {
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.historic-flights h2 {
+  margin-top: 0;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-color);
+  padding-bottom: 10px;
+}
+
+.filters-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: var(--bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.search-input,
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.filter-info {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.flights-table-full {
+  width: 100%;
+}
+
+.flights-table-full thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.flights-table-full thead th.sortable:hover {
+  background-color: var(--border-light);
+}
+
+.flights-table-full tbody tr.hawarden-flight {
+  background-color: var(--success-bg);
+}
+
+[data-theme="dark"] .flights-table-full tbody tr.hawarden-flight {
+  background-color: rgba(75, 192, 192, 0.2);
+}
+
+.flights-table-full td.datetime {
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.flights-table-full td.no-flights {
+  text-align: center;
+  padding: 30px 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
