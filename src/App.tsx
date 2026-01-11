@@ -38,6 +38,7 @@ import HistorySelector from './components/HistorySelector'
 import ProximityDisplay from './components/ProximityDisplay'
 import FleetStatus from './components/FleetStatus'
 import ScheduledFlights from './components/ScheduledFlights'
+import HistoricFlights from './components/HistoricFlights'
 import './App.css'
 
 // Theme context
@@ -339,6 +340,7 @@ function App() {
         </div>
         <FleetStatus allRegistrations={BELUGA_REGISTRATIONS} activePlanes={planes} scrapedData={scrapedData} historyData={historyData} schedules={scrapedData.schedules || []} />
         <ScheduledFlights schedules={scrapedData.schedules || []} />
+        <HistoricFlights schedules={scrapedData.schedules || []} />
       </div>
     </ThemeContext.Provider>
   )
