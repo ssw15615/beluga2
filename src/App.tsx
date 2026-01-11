@@ -311,8 +311,8 @@ function App() {
               data = await fetchHistorySnapshots(reg, startTime, now)
             }
             
-            // Increased delay to 1 second to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            // Respect 10 req/min limit: 7 seconds between requests
+            await new Promise(resolve => setTimeout(resolve, 7000))
           } catch (error) {
             console.error(`[fetchHistoryData] Error fetching comprehensive history for ${reg}:`, error)
             // Fallback to snapshots
@@ -338,7 +338,7 @@ function App() {
   // Helper function to fetch snapshots at regular intervals (fallback)
   const fetchHistorySnapshots = async (reg: string, startTime: number, endTime: number) => {
     const positions: any[] = []
-    const interval = Math.max(3600, (endTime - startTime) / 6) // 6 snapshots (reduced from 12) or 1-hour intervals
+    const interval = Math.max(7200, (endTime - startTime) / 3) // 3 snapshots (reduced from 6) or 2-hour intervals
     const timestamps: number[] = []
     
     for (let ts = startTime; ts < endTime; ts += interval) {
@@ -372,7 +372,7 @@ function App() {
             setCachedData(cacheKey, data)
           }
           
-          await new Promise(resolve => setTimeout(resolve, 2000)) // Increased from 200ms to 2s
+          await new Promise(resolve => setTimeout(resolve, 7000)) // 7 seconds between requests (10 req/min limit)
         } catch (error) {
           console.error(`Error fetching snapshot for ${reg} at ${ts}:`, error)
         }
