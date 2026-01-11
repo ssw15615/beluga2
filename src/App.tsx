@@ -14,7 +14,6 @@ function urlBase64ToUint8Array(base64String: string) {
 
 // TODO: Replace with your backend endpoint and VAPID public key
 const VAPID_PUBLIC_KEY = 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
-const PUSH_SUBSCRIBE_ENDPOINT = 'https://your-backend.example.com/api/subscribe';
 
 interface Plane {
   fr24_id: string
@@ -32,6 +31,7 @@ interface Plane {
   heading?: number
   dist?: number
 }
+
 import Map from './components/Map'
 import PlaneList from './components/PlaneList'
 import HistorySelector from './components/HistorySelector'
@@ -41,7 +41,6 @@ import ScheduledFlights from './components/ScheduledFlights'
 import HistoricFlights from './components/HistoricFlights'
 import './App.css'
 
-// Theme context
 // Subscribe user to push notifications and send to backend
 function usePushSubscription() {
   useEffect(() => {
@@ -51,27 +50,32 @@ function usePushSubscription() {
         const existing = await registration.pushManager.getSubscription();
         if (!existing) {
           try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
             const sub = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
             // Send subscription to backend
-            await fetch(PUSH_SUBSCRIBE_ENDPOINT, {
+            await fetch(`${API_URL}/api/subscribe`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(sub),
             });
-            console.log('Push subscription sent to backend');
+            console.log('✅ Push notifications enabled: You will be notified when a Beluga flies to Chester or becomes active');
           } catch (err) {
             console.error('Push subscription failed:', err);
           }
         } else {
-          console.log('Already subscribed to push');
+          console.log('✅ Already subscribed to push notifications');
         }
       });
+    } else {
+      console.log('⚠️ Push notifications not supported in this browser');
     }
   }, []);
 }
+
+// Theme context
 const ThemeContext = React.createContext<{
   theme: 'light' | 'dark'
   toggleTheme: () => void
