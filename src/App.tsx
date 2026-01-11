@@ -178,6 +178,9 @@ function App() {
       const schedules = await scheduleRes.json()
       const locationsData = await locationsRes.json()
       setScrapedData({ schedules, locations: locationsData })
+      
+      // Also fetch history data when user clicks scrape
+      await fetchHistoryData()
     } catch (e) {
       console.error('Scrape failed:', e)
     }
