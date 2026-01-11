@@ -3,6 +3,7 @@ import webpush from 'web-push';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import fs from 'fs';
+import fetch from 'node-fetch';
 
 const app = express();
 const PORT = 4000;
@@ -23,6 +24,12 @@ app.use(bodyParser.json());
 // Store subscriptions in memory (for demo); use a DB for production
 let subscriptions = [];
 const SUBS_FILE = './subscriptions.json';
+
+// Beluga monitoring state
+const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO'];
+const API_KEY = '019b9077-3179-71c5-a92f-b1879c84889b|TMlN9GK6WOMVo4nBWcR6BBBQRNwMvFzUycKuynx561cf2b00';
+let previousActivePlanes = new Set();
+let previousChesterBound = new Set();
 
 // Load subscriptions from file if exists
 if (fs.existsSync(SUBS_FILE)) {
@@ -111,4 +118,118 @@ app.post('/api/notify', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
+  
+  // Start monitoring Belugas
+  console.log('Starting Beluga monitoring for push notifications...');
+  monitorBelugas();
 });
+
+// Function to fetch live Beluga data from Flightradar24
+async function fetchLiveBelugas() {
+  try {
+    const response = await fetch(
+      `https://fr24api.flightradar24.com/api/live/flight-positions/full?registrations=${BELUGA_REGISTRATIONS.join(',')}`,
+      {
+        headers: {
+          'accept': 'application/json',
+          'accept-version': 'v1',
+          'authorization': `Bearer ${API_KEY}`
+        }
+      }
+    );
+
+    if (response.status === 429) {
+      console.log('Rate limited - skipping this check');
+      return [];
+    }
+
+    if (!response.ok) {
+      console.error('Failed to fetch live data:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching live Beluga data:', error);
+    return [];
+  }
+}
+
+// Function to send push notifications to all subscribed users
+async function sendPushNotification(title, body, url = '/') {
+  if (subscriptions.length === 0) {
+    console.log('No subscriptions to send notification to');
+    return;
+  }
+
+  const payload = JSON.stringify({ title, body, url });
+  let sent = 0;
+  let failed = 0;
+
+  for (const sub of subscriptions) {
+    try {
+      await webpush.sendNotification(sub, payload);
+      sent++;
+    } catch (err) {
+      console.error('Push notification failed:', err);
+      failed++;
+      // Remove invalid subscriptions
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        subscriptions = subscriptions.filter(s => s.endpoint !== sub.endpoint);
+        saveSubscriptions();
+      }
+    }
+  }
+
+  console.log(`Push notification sent: ${sent} successful, ${failed} failed`);
+  console.log(`Title: ${title}`);
+  console.log(`Body: ${body}`);
+}
+
+// Monitor Belugas and send notifications
+async function monitorBelugas() {
+  const planes = await fetchLiveBelugas();
+  
+  // Get current active plane registrations
+  const currentActivePlanes = new Set(planes.map(p => p.reg));
+  
+  // Check for newly active planes
+  for (const reg of currentActivePlanes) {
+    if (!previousActivePlanes.has(reg)) {
+      const plane = planes.find(p => p.reg === reg);
+      console.log(`🔔 New active Beluga detected: ${reg} (${plane?.flight || 'Unknown flight'})`);
+      await sendPushNotification(
+        `Beluga ${reg} is now Active! ✈️`,
+        `Flight ${plane?.flight || 'Unknown'} is now airborne`,
+        '/'
+      );
+    }
+  }
+  
+  // Check for planes flying to Chester (EGNR)
+  const currentChesterBound = new Set();
+  for (const plane of planes) {
+    if (plane.dest_icao === 'EGNR') {
+      currentChesterBound.add(plane.reg);
+      
+      // Only notify if this is a new Chester-bound flight
+      if (!previousChesterBound.has(plane.reg)) {
+        console.log(`🔔 Beluga heading to Chester detected: ${plane.reg} (${plane.flight})`);
+        await sendPushNotification(
+          `Beluga ${plane.reg} heading to Chester! 🎯`,
+          `Flight ${plane.flight} is en route to EGNR`,
+          '/'
+        );
+      }
+    }
+  }
+  
+  // Update previous state
+  previousActivePlanes = currentActivePlanes;
+  previousChesterBound = currentChesterBound;
+  
+  // Schedule next check in 2 minutes (to respect rate limits)
+  setTimeout(monitorBelugas, 120000); // 2 minutes
+}
+
