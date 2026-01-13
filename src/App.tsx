@@ -274,13 +274,16 @@ function App() {
 
   const fetchFromADSBExchange = async () => {
     try {
-      // ADS-B Exchange API - fetch all Belugas
+      // ADS-B Exchange rapid API - publicly accessible
       const allPlanes = []
       for (const reg of BELUGA_REGISTRATIONS) {
         try {
-          const response = await fetch(`https://adsbexchange.com/api/aircraft/v2/registration/${reg}`)
+          // Use the public lol endpoint with ICAO hex codes
+          // Note: You may need to look up the hex codes for these registrations
+          const response = await fetch(`https://globe.adsbexchange.com/api/v2/registration/${reg}`)
           if (!response.ok) {
-            throw new Error(`ADSBX API error: ${response.status}`)
+            console.log(`ADSBX error for ${reg}: ${response.status}`)
+            continue
           }
           const data = await response.json()
           if (data.ac && data.ac.length > 0) {
@@ -307,7 +310,7 @@ function App() {
         }
       }
       console.log('ADSBX API response:', allPlanes)
-      setApiStatus(prev => ({ ...prev, adsbx: true }))
+      setApiStatus(prev => ({ ...prev, adsbx: allPlanes.length > 0 ? true : null }))
       return allPlanes
     } catch (error) {
       console.error('ADS-B Exchange API error:', error)

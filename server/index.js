@@ -23,18 +23,39 @@ webpush.setVapidDetails(
 
 // Configure CORS to allow Vercel frontend
 const corsOptions = {
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:4173',
-    'https://beluga2-ammr.vercel.app',
-    /\.vercel\.app$/  // Allow all Vercel preview deployments
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:4173',
+      'https://beluga2-ammr.vercel.app'
+    ];
+    
+    // Check if origin is in allowed list or matches Vercel pattern
+    if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    service: 'Beluga Tracker API',
+    timestamp: new Date().toISOString(),
+    hasApiKey: !!API_KEY
+  });
+});
 
 // Store subscriptions in memory (for demo); use a DB for production
 let subscriptions = [];
