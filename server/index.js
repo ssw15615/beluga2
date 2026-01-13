@@ -31,7 +31,8 @@ const corsOptions = {
       'http://localhost:5173',
       'http://localhost:5174',
       'http://localhost:4173',
-      'https://beluga2-ammr.vercel.app'
+      'https://beluga2-ammr.vercel.app',
+      'https://beluga.stbw.co.uk'
     ];
     
     // Check if origin is in allowed list or matches Vercel pattern
