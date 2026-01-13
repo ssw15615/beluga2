@@ -115,17 +115,155 @@ body {
 }
 
 /* Airport Popup Styles */
-.airport-popup {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  min-width: 200px;
-  padding: 0.5rem;
+.airport-popup-container .leaflet-popup-content-wrapper {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px var(--shadow-hover);
+  padding: 0;
+  transform: scale(var(--popup-scale, 1));
+  transform-origin: bottom center;
+  transition: transform 0.3s ease;
 }
 
-.airport-popup h3 {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-primary);
-  font-size: 1rem;
+.airport-popup-container .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+
+.airport-popup {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-width: 179px;
+  padding: 0;
+}
+
+.airport-header {
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+  color: white;
+  padding: 0.525rem;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.airport-header h3 {
+  margin: 0;
+  font-size: 0.735rem;
   font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.airport-badge {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  padding: 0.21rem 0.42rem;
+  border-radius: 11px;
+  font-size: 0.455rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.airport-info {
+  display: flex;
+  gap: 0.28rem;
+  padding: 0.42rem 0.525rem;
+  flex-wrap: wrap;
+}
+
+.info-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.21rem;
+  background: var(--bg-tertiary);
+  padding: 0.21rem 0.42rem;
+  border-radius: 11px;
+  font-size: 0.525rem;
+  border: 1px solid var(--border-light);
+}
+
+.info-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.info-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Weather Box Styles */
+.weather-box {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.525rem;
+  margin: 0.42rem 0.525rem;
+  border-radius: 7px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.weather-header {
+  display: flex;
+  align-items: center;
+  gap: 0.525rem;
+  margin-bottom: 0.28rem;
+}
+
+.weather-icon {
+  font-size: 1.54rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.weather-temp {
+  font-size: 1.33rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.weather-description {
+  font-size: 0.63rem;
+  font-weight: 500;
+  margin-bottom: 0.42rem;
+  text-transform: capitalize;
+  opacity: 0.95;
+}
+
+.weather-details {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 5.6px;
+  padding: 0.42rem;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.weather-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.525rem;
+}
+
+.weather-label {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.weather-value {
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+}
+
+.weather-loading, .weather-error {
+  text-align: center;
+  padding: 1rem;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .airport-popup p {
@@ -135,32 +273,49 @@ body {
 }
 
 .airport-planes {
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-light);
+  margin: 0 0.525rem 0.525rem 0.525rem;
+  padding: 0.525rem;
+  border-top: 2px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 0 0 7px 7px;
 }
 
 .airport-planes h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.9rem;
+  margin: 0 0 0.42rem 0;
+  font-size: 0.595rem;
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .planes-at-airport {
   margin: 0;
   padding: 0;
   list-style: none;
+  display: grid;
+  gap: 0.5rem;
 }
 
 .planes-at-airport li {
-  padding: 0.25rem 0;
-  font-size: 0.8rem;
-  border-bottom: 1px solid var(--border-light);
+  padding: 0.42rem;
+  font-size: 0.525rem;
+  background: var(--bg-primary);
+  border-radius: 4.2px;
+  border: 1.4px solid var(--accent-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
 }
 
-.planes-at-airport li:last-child {
-  border-bottom: none;
+.planes-at-airport li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.planes-at-airport li strong {
+  color: var(--accent-color);
+  font-size: 0.56rem;
 }
 
 .no-planes {

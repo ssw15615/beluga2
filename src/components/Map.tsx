@@ -1,6 +1,7 @@
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import { useState, useEffect } from 'react'
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -65,6 +66,132 @@ interface MapProps {
   scrapedData: { locations: { [key: string]: string } }
 }
 
+interface WeatherData {
+  temp: number
+  feels_like: number
+  humidity: number
+  pressure: number
+  wind_speed: number
+  wind_deg: number
+  description: string
+  icon: string
+  visibility: number
+  clouds: number
+}
+
+const WeatherDisplay = ({ airportCode, lat, lon }: { airportCode: string, lat: number, lon: number }) => {
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Using Open-Meteo (free, no API key needed)
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m&timezone=auto`)
+      .then(res => res.json())
+      .then(data => {
+        const current = data.current
+        const weatherCode = current.weather_code
+        
+        // WMO Weather interpretation codes
+        const getWeatherDescription = (code: number) => {
+          if (code === 0) return { desc: 'Clear sky', icon: '☀️' }
+          if (code <= 3) return { desc: 'Partly cloudy', icon: '⛅' }
+          if (code <= 48) return { desc: 'Foggy', icon: '🌫️' }
+          if (code <= 67) return { desc: 'Rainy', icon: '🌧️' }
+          if (code <= 77) return { desc: 'Snowy', icon: '❄️' }
+          if (code <= 82) return { desc: 'Rain showers', icon: '🌦️' }
+          if (code <= 86) return { desc: 'Snow showers', icon: '🌨️' }
+          return { desc: 'Thunderstorm', icon: '⛈️' }
+        }
+        
+        const weatherInfo = getWeatherDescription(weatherCode)
+        
+        setWeather({
+          temp: Math.round(current.temperature_2m),
+          feels_like: Math.round(current.apparent_temperature),
+          humidity: current.relative_humidity_2m,
+          pressure: Math.round(current.pressure_msl),
+          wind_speed: Math.round(current.wind_speed_10m * 0.539957), // Convert to knots
+          wind_deg: current.wind_direction_10m,
+          description: weatherInfo.desc,
+          icon: weatherInfo.icon,
+          visibility: 10, // Open-Meteo doesn't provide visibility
+          clouds: current.cloud_cover
+        })
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Weather fetch error:', err)
+        setLoading(false)
+      })
+  }, [lat, lon])
+
+  if (loading) return <div className="weather-loading">⏳ Loading weather...</div>
+  if (!weather) return <div className="weather-error">❌ Weather unavailable</div>
+
+  const getWindDirection = (deg: number) => {
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    return directions[Math.round(deg / 22.5) % 16]
+  }
+
+  return (
+    <div className="weather-box">
+      <div className="weather-header">
+        <span className="weather-icon">{weather.icon}</span>
+        <span className="weather-temp">{weather.temp}°C</span>
+      </div>
+      <div className="weather-description">{weather.description}</div>
+      <div className="weather-details">
+        <div className="weather-row">
+          <span className="weather-label">🌡️ Feels like:</span>
+          <span className="weather-value">{weather.feels_like}°C</span>
+        </div>
+        <div className="weather-row">
+          <span className="weather-label">💧 Humidity:</span>
+          <span className="weather-value">{weather.humidity}%</span>
+        </div>
+        <div className="weather-row">
+          <span className="weather-label">🌬️ Wind:</span>
+          <span className="weather-value">{weather.wind_speed} kt {getWindDirection(weather.wind_deg)}</span>
+        </div>
+        <div className="weather-row">
+          <span className="weather-label">🔽 Pressure:</span>
+          <span className="weather-value">{weather.pressure} hPa</span>
+        </div>
+        <div className="weather-row">
+          <span className="weather-label">☁️ Cloud cover:</span>
+          <span className="weather-value">{weather.clouds}%</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Component to track zoom level and update CSS variable
+const ZoomHandler = () => {
+  const [zoom, setZoom] = useState(4)
+  
+  const map = useMapEvents({
+    zoomend: () => {
+      const currentZoom = map.getZoom()
+      setZoom(currentZoom)
+      // Calculate scale factor: zoom 4 = 1.0, each zoom level adjusts by ~35%
+      const baseZoom = 4
+      const scaleFactor = Math.pow(1.35, currentZoom - baseZoom)
+      const clampedScale = Math.max(0.3, Math.min(2.0, scaleFactor)) // Clamp between 30% and 200%
+      
+      // Update CSS variable for popup scaling
+      document.documentElement.style.setProperty('--popup-scale', clampedScale.toString())
+    }
+  })
+  
+  useEffect(() => {
+    // Set initial scale
+    document.documentElement.style.setProperty('--popup-scale', '1')
+  }, [])
+  
+  return null
+}
+
 const Map = ({ planes, historyData, scrapedData }: MapProps) => {
   const historyLines = Object.entries(historyData).map(([reg, positions]) => ({
     reg,
@@ -119,9 +246,18 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
 
   return (
     <MapContainer center={[50, 0]} zoom={4} className="map-container">
+      <ZoomHandler />
+      {/* Satellite imagery */}
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+        maxZoom={19}
+      />
+      {/* Labels overlay */}
+      <TileLayer
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        maxZoom={19}
       />
       {planes.map(plane => (
         <Marker key={plane.fr24_id} position={[plane.lat, plane.lon]} icon={createRotatedIcon(plane.heading)}>
@@ -152,12 +288,29 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
         const planesAtAirport = getPlanesAtAirportFromScraped(airport.code)
         return (
           <Marker key={airport.code} position={[airport.lat, airport.lon]} icon={airportIcon}>
-            <Popup>
+            <Popup 
+              maxWidth={224} 
+              className="airport-popup-container"
+              autoPan={true}
+              autoPanPadding={[100, 100]}
+            >
               <div className="airport-popup">
-                <h3>🏭 Airbus {airport.name}</h3>
-                <p><strong>ICAO:</strong> {airport.code}</p>
-                <p><strong>Type:</strong> {airport.type}</p>
-                <p><strong>Coordinates:</strong> {airport.lat.toFixed(4)}°, {airport.lon.toFixed(4)}°</p>
+                <div className="airport-header">
+                  <h3>🏭 {airport.name}</h3>
+                  <div className="airport-badge">{airport.type}</div>
+                </div>
+                <div className="airport-info">
+                  <div className="info-pill">
+                    <span className="info-label">ICAO:</span>
+                    <span className="info-value">{airport.code}</span>
+                  </div>
+                  <div className="info-pill">
+                    <span className="info-label">📍</span>
+                    <span className="info-value">{airport.lat.toFixed(4)}°, {airport.lon.toFixed(4)}°</span>
+                  </div>
+                </div>
+                
+                <WeatherDisplay airportCode={airport.code} lat={airport.lat} lon={airport.lon} />
                 
                 <div className="airport-planes">
                   <h4>✈️ Beluga XL Planes Present:</h4>
