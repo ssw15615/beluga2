@@ -26,6 +26,7 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [filterAircraft, setFilterAircraft] = useState('')
   const [filterDeparture, setFilterDeparture] = useState('')
+  const [filterArrival, setFilterArrival] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
 
@@ -44,6 +45,15 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
     return Array.from(departures).sort()
   }, [schedules])
 
+  const uniqueArrivals = useMemo(() => {
+    const arrivals = new Set(
+      schedules
+        .map(f => f.arrival || f.route)
+        .filter(Boolean)
+    )
+    return Array.from(arrivals).sort()
+  }, [schedules])
+
   // Filter and sort flights
   const filteredFlights = useMemo(() => {
     let filtered = schedules.filter(flight => {
@@ -57,8 +67,9 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
 
       const matchesAircraft = !filterAircraft || flight.aircraft === filterAircraft
       const matchesDeparture = !filterDeparture || (flight.departure || flight.airport) === filterDeparture
+      const matchesArrival = !filterArrival || (flight.arrival || flight.route) === filterArrival
 
-      return matchesSearch && matchesAircraft && matchesDeparture
+      return matchesSearch && matchesAircraft && matchesDeparture && matchesArrival
     })
 
     // Sort
@@ -98,7 +109,7 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
     })
 
     return filtered
-  }, [schedules, searchTerm, sortField, sortOrder, filterAircraft, filterDeparture])
+  }, [schedules, searchTerm, sortField, sortOrder, filterAircraft, filterDeparture, filterArrival])
 
   // Pagination
   const totalPages = Math.ceil(filteredFlights.length / itemsPerPage)
@@ -110,7 +121,7 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
   // Reset to page 1 when filters change
   useMemo(() => {
     setCurrentPage(1)
-  }, [searchTerm, filterAircraft, filterDeparture])
+  }, [searchTerm, filterAircraft, filterDeparture, filterArrival])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -169,6 +180,21 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
             <option value="">All Departures</option>
             {uniqueDepartures.map(departure => (
               <option key={departure} value={departure}>{departure}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="arrival-filter">Arrival:</label>
+          <select
+            id="arrival-filter"
+            value={filterArrival}
+            onChange={(e) => setFilterArrival(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">All Arrivals</option>
+            {uniqueArrivals.map(arrival => (
+              <option key={arrival} value={arrival}>{arrival}</option>
             ))}
           </select>
         </div>
