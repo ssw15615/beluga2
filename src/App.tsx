@@ -328,25 +328,29 @@ function App() {
         try {
           data = await fetchFromFlightRadar24()
         } catch (error) {
-          console.log('FR24 failed, trying ADSBX...')
-          data = await fetchFromADSBExchange()
-          // Auto-switch to working API
-          setApiSource('adsbexchange')
+          console.log('FR24 failed - API credit limit reached')
+          setApiStatus(prev => ({ ...prev, adsbx: false }))
+          setPlanes([])
+          return
         }
       } else {
+        // ADSBX is blocked by CORS in browsers
+        console.log('ADSBX requires server-side proxy (not implemented yet)')
+        setApiStatus(prev => ({ ...prev, adsbx: false }))
+        // Try FR24 as fallback
         try {
-          data = await fetchFromADSBExchange()
-        } catch (error) {
-          console.log('ADSBX failed, trying FR24...')
           data = await fetchFromFlightRadar24()
-          // Auto-switch to working API
           setApiSource('flightradar24')
+        } catch (error) {
+          console.log('Both APIs unavailable')
+          setPlanes([])
+          return
         }
       }
       
       setPlanes(data || [])
     } catch (error) {
-      console.error('Both APIs failed:', error)
+      console.error('Error fetching live data:', error)
       if (retryCount < 3) {
         setTimeout(() => fetchLiveData(retryCount + 1), 5000)
       }
