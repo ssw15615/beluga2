@@ -90,7 +90,7 @@ const EGNR_LAT = 53.1744
 const EGNR_LON = -2.9779
 const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
 
-type ApiSource = 'flightradar24' | 'adsbexchange'
+type ApiSource = 'flightradar24' | 'adsbexchange' | 'none'
 
 // Cache helper functions
 const getCacheKey = (reg: string, timestamp: number) => `fr24_history_${reg}_${timestamp}`
@@ -144,7 +144,7 @@ function App() {
   })
   const [scrapedData, setScrapedData] = useState<any>({ schedules: [], locations: {} })
   const [apiSource, setApiSource] = useState<ApiSource>(() => {
-    return (localStorage.getItem('apiSource') as ApiSource) || 'flightradar24'
+    return (localStorage.getItem('apiSource') as ApiSource) || 'none'
   })
   const [apiStatus, setApiStatus] = useState<{ fr24: boolean | null, adsbx: boolean | null }>({
     fr24: null,
@@ -277,6 +277,13 @@ function App() {
 
   const fetchLiveData = async (retryCount = 0) => {
     try {
+      // If API source is 'none', skip fetching
+      if (apiSource === 'none') {
+        console.log('Flight tracking API disabled')
+        setPlanes([])
+        return
+      }
+      
       let data
       
       // Try selected API first
@@ -475,6 +482,16 @@ function App() {
                   onChange={(e) => setApiSource(e.target.value as ApiSource)}
                 />
                 ADSBX
+              </label>
+              <label className="api-label">
+                <input
+                  type="radio"
+                  name="apiSource"
+                  value="none"
+                  checked={apiSource === 'none'}
+                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                />
+                Off
               </label>
             </div>
             <ThemeToggle />
