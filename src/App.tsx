@@ -150,6 +150,7 @@ function App() {
     fr24: null,
     adsbx: null
   })
+  const [backendApiSource, setBackendApiSource] = useState<'opensky' | 'fr24'>('opensky')
 
   // Fetch schedule and location data from backend
   useEffect(() => {
@@ -219,6 +220,39 @@ function App() {
       alert('Test notification failed - check console')
     }
   }
+
+  const changeBackendApiSource = async (source: 'opensky' | 'fr24') => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+      const res = await fetch(`${API_URL}/api/source`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setBackendApiSource(source)
+        console.log(`Backend API source changed to: ${source}`)
+      }
+    } catch (e) {
+      console.error('Failed to change backend API source:', e)
+    }
+  }
+
+  // Fetch current backend API source on mount
+  useEffect(() => {
+    const fetchBackendSource = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+        const res = await fetch(`${API_URL}/api/source`)
+        const data = await res.json()
+        setBackendApiSource(data.source)
+      } catch (e) {
+        console.error('Failed to fetch backend API source:', e)
+      }
+    }
+    fetchBackendSource()
+  }, [])
 
   useEffect(() => {
     // Data is hardcoded from scraping
@@ -516,6 +550,29 @@ function App() {
               </label>
             </div>
             <ThemeToggle />
+            <div className="api-selector" style={{ marginLeft: '0.75rem' }}>
+              <span style={{ fontSize: '0.9rem', marginRight: '0.5rem' }}>Backend:</span>
+              <label className="api-label">
+                <input
+                  type="radio"
+                  name="backendApiSource"
+                  value="opensky"
+                  checked={backendApiSource === 'opensky'}
+                  onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
+                />
+                OpenSky
+              </label>
+              <label className="api-label">
+                <input
+                  type="radio"
+                  name="backendApiSource"
+                  value="fr24"
+                  checked={backendApiSource === 'fr24'}
+                  onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
+                />
+                FR24
+              </label>
+            </div>
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
             <button onClick={testNotification} className="theme-toggle" title="Send test push notification">🔔 Test Push</button>
           </div>

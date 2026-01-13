@@ -67,6 +67,7 @@ const SUBS_FILE = './subscriptions.json';
 // Beluga monitoring state
 const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO'];
 const API_KEY = process.env.FR24_API_KEY;
+let apiSource = process.env.API_SOURCE || 'opensky'; // 'opensky' or 'fr24'
 let previousActivePlanes = new Set();
 let previousChesterBound = new Set();
 
@@ -159,17 +160,90 @@ app.post('/api/notify', async (req, res) => {
   res.json({ sent });
 });
 
+// Get/Set API source
+app.get('/api/source', (req, res) => {
+  res.json({ source: apiSource });
+});
+
+app.post('/api/source', (req, res) => {
+  const { source } = req.body;
+  if (source === 'opensky' || source === 'fr24') {
+    apiSource = source;
+    console.log(`API source changed to: ${apiSource}`);
+    res.json({ success: true, source: apiSource });
+  } else {
+    res.status(400).json({ success: false, error: 'Invalid source. Use "opensky" or "fr24"' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
+  console.log(`API Source: ${apiSource}`);
   
   // Start monitoring Belugas
   console.log('Starting Beluga monitoring for push notifications...');
   monitorBelugas();
 });
 
+// ICAO hex codes for Beluga registrations (for OpenSky)
+const BELUGA_ICAO_HEX = {
+  'F-GXLG': '3944ef',
+  'F-GXLH': '3944f0',
+  'F-GXLI': '3944f1',
+  'F-GXLJ': '3944f2',
+  'F-GXLN': '394b4f',
+  'F-GXLO': '394b50'
+};
+
+// Function to fetch live Beluga data from OpenSky Network
+async function fetchFromOpenSky() {
+  try {
+    const response = await fetch('https://opensky-network.org/api/states/all');
+    
+    if (!response.ok) {
+      console.error('OpenSky API error:', response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    const planes = [];
+    
+    // Filter for our Belugas by ICAO24 hex code
+    const belugaHexCodes = Object.values(BELUGA_ICAO_HEX);
+    for (const state of data.states || []) {
+      const icao24 = state[0];
+      if (belugaHexCodes.includes(icao24)) {
+        // Find registration from hex code
+        const reg = Object.keys(BELUGA_ICAO_HEX).find(key => BELUGA_ICAO_HEX[key] === icao24);
+        
+        planes.push({
+          fr24_id: icao24,
+          flight: (state[1] || '').trim() || reg,
+          callsign: (state[1] || '').trim(),
+          lat: state[6],
+          lon: state[5],
+          alt: state[7] || state[13] || 0, // baro_altitude or geo_altitude
+          gspeed: state[9] || 0, // velocity in m/s
+          reg: reg,
+          type: 'BelugaXL',
+          orig_iata: '',
+          dest_iata: '',
+          dest_icao: '', // OpenSky doesn't provide destination
+          heading: state[10] || 0 // true_track
+        });
+      }
+    }
+    
+    return planes;
+  } catch (error) {
+    console.error('Error fetching from OpenSky:', error);
+    return [];
+  }
+}
+
 // Function to fetch live Beluga data from Flightradar24
-async function fetchLiveBelugas() {
+async function fetchFromFR24() {
   try {
     const response = await fetch(
       `https://fr24api.flightradar24.com/api/live/flight-positions/full?registrations=${BELUGA_REGISTRATIONS.join(',')}`,
@@ -196,6 +270,20 @@ async function fetchLiveBelugas() {
     return data.data || [];
   } catch (error) {
     console.error('Error fetching live Beluga data:', error);
+    return [];
+  }
+}
+
+// Function to fetch live Beluga data from selected API
+async function fetchLiveBelugas() {
+  if (apiSource === 'opensky') {
+    console.log('Fetching from OpenSky Network...');
+    return await fetchFromOpenSky();
+  } else if (apiSource === 'fr24') {
+    console.log('Fetching from FlightRadar24...');
+    return await fetchFromFR24();
+  } else {
+    console.error('Unknown API source:', apiSource);
     return [];
   }
 }
