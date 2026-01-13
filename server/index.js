@@ -65,7 +65,7 @@ let subscriptions = [];
 const SUBS_FILE = './subscriptions.json';
 
 // Beluga monitoring state
-const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO'];
+const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO', 'F-GSTF'];
 const API_KEY = process.env.FR24_API_KEY;
 let apiSource = process.env.API_SOURCE || 'opensky'; // 'opensky' or 'fr24'
 let previousActivePlanes = new Set();
@@ -193,7 +193,8 @@ const BELUGA_ICAO_HEX = {
   'F-GXLI': '3944f1',
   'F-GXLJ': '3944f2',
   'F-GXLN': '394b4f',
-  'F-GXLO': '394b50'
+  'F-GXLO': '394b50',
+  'F-GSTF': '3850d5'
 };
 
 // Function to fetch live Beluga data from OpenSky Network

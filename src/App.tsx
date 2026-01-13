@@ -150,7 +150,7 @@ const ThemeContext = React.createContext<{
   toggleTheme: () => {}
 })
 
-const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO']
+const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO', 'F-GSTF']
 const FR24_API_KEY = import.meta.env.VITE_FR24_API_KEY || ''
 const EGNR_LAT = 53.1744
 const EGNR_LON = -2.9779
@@ -165,7 +165,8 @@ const BELUGA_ICAO_HEX: { [key: string]: string } = {
   'F-GXLI': '3944f1',
   'F-GXLJ': '3944f2',
   'F-GXLN': '394b4f',
-  'F-GXLO': '394b50'
+  'F-GXLO': '394b50',
+  'F-GSTF': '3850d5'
 }
 
 // Cache helper functions
