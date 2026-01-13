@@ -230,6 +230,7 @@ function App() {
     fr24: null
   })
   const [backendApiSource, setBackendApiSource] = useState<'opensky' | 'fr24'>('opensky')
+  const [showApiSettings, setShowApiSettings] = useState(false)
 
   // Fetch schedule and location data from backend
   useEffect(() => {
@@ -692,66 +693,87 @@ function App() {
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <div className="app">
+        {/* API Settings Modal */}
+        {showApiSettings && (
+          <div className="modal-overlay" onClick={() => setShowApiSettings(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>API Settings</h2>
+                <button className="modal-close" onClick={() => setShowApiSettings(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <div className="settings-section">
+                  <h3>Frontend API Source</h3>
+                  <p className="settings-description">Controls which API the frontend uses for live tracking</p>
+                  <div className="api-selector" style={{ marginTop: '0.5rem' }}>
+                    <label className="api-label">
+                      <input
+                        type="radio"
+                        name="apiSource"
+                        value="opensky"
+                        checked={apiSource === 'opensky'}
+                        onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                      />
+                      OpenSky
+                    </label>
+                    <label className="api-label">
+                      <span className={`api-status ${apiStatus.fr24 === true ? 'online' : apiStatus.fr24 === false ? 'offline' : 'unknown'}`}>●</span>
+                      <input
+                        type="radio"
+                        name="apiSource"
+                        value="flightradar24"
+                        checked={apiSource === 'flightradar24'}
+                        onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                      />
+                      FR24
+                    </label>
+                    <label className="api-label">
+                      <input
+                        type="radio"
+                        name="apiSource"
+                        value="none"
+                        checked={apiSource === 'none'}
+                        onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                      />
+                      Off
+                    </label>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h3>Backend API Source</h3>
+                  <p className="settings-description">Controls which API the backend uses for push notifications</p>
+                  <div className="api-selector" style={{ marginTop: '0.5rem' }}>
+                    <label className="api-label">
+                      <input
+                        type="radio"
+                        name="backendApiSource"
+                        value="opensky"
+                        checked={backendApiSource === 'opensky'}
+                        onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
+                      />
+                      OpenSky
+                    </label>
+                    <label className="api-label">
+                      <input
+                        type="radio"
+                        name="backendApiSource"
+                        value="fr24"
+                        checked={backendApiSource === 'fr24'}
+                        onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
+                      />
+                      FR24
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="header">
           <h1>Airbus Beluga XL Fleet Tracker</h1>
           <div className="header-buttons">
-            <div className="api-selector">
-              <label className="api-label">
-                <input
-                  type="radio"
-                  name="apiSource"
-                  value="opensky"
-                  checked={apiSource === 'opensky'}
-                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
-                />
-                OpenSky
-              </label>
-              <label className="api-label">
-                <span className={`api-status ${apiStatus.fr24 === true ? 'online' : apiStatus.fr24 === false ? 'offline' : 'unknown'}`}>●</span>
-                <input
-                  type="radio"
-                  name="apiSource"
-                  value="flightradar24"
-                  checked={apiSource === 'flightradar24'}
-                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
-                />
-                FR24
-              </label>
-              <label className="api-label">
-                <input
-                  type="radio"
-                  name="apiSource"
-                  value="none"
-                  checked={apiSource === 'none'}
-                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
-                />
-                Off
-              </label>
-            </div>
             <ThemeToggle />
-            <div className="api-selector" style={{ marginLeft: '0.75rem' }}>
-              <span style={{ fontSize: '0.9rem', marginRight: '0.5rem' }}>Backend:</span>
-              <label className="api-label">
-                <input
-                  type="radio"
-                  name="backendApiSource"
-                  value="opensky"
-                  checked={backendApiSource === 'opensky'}
-                  onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
-                />
-                OpenSky
-              </label>
-              <label className="api-label">
-                <input
-                  type="radio"
-                  name="backendApiSource"
-                  value="fr24"
-                  checked={backendApiSource === 'fr24'}
-                  onChange={(e) => changeBackendApiSource(e.target.value as 'opensky' | 'fr24')}
-                />
-                FR24
-              </label>
-            </div>
+            <button onClick={() => setShowApiSettings(true)} className="theme-toggle" title="Configure API settings">⚙️ API Settings</button>
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
             <button onClick={testNotification} className="theme-toggle" title="Send test push notification">🔔 Test Push</button>
             <button onClick={handleLogout} className="theme-toggle" title="Logout">🚪 Logout</button>
