@@ -29,6 +29,7 @@ const corsOptions = {
     
     const allowedOrigins = [
       'http://localhost:5173',
+      'http://localhost:5174',
       'http://localhost:4173',
       'https://beluga2-ammr.vercel.app'
     ];
@@ -37,6 +38,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin) || origin.includes('.vercel.app')) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
