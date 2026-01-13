@@ -1,8 +1,29 @@
+import { useState, useMemo } from 'react'
+
 interface ScheduledFlightsProps {
   schedules: any[]
 }
 
 const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
+
+  const sortedFlights = useMemo(() => {
+    return schedules
+      .slice()
+      .sort((a: any, b: any) => {
+        const ad = a?.datetime || a?.scrapedAt || ''
+        const bd = b?.datetime || b?.scrapedAt || ''
+        return (bd as string).localeCompare(ad as string)
+      })
+  }, [schedules])
+
+  const totalPages = Math.ceil(sortedFlights.length / itemsPerPage)
+  const paginatedFlights = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return sortedFlights.slice(startIndex, startIndex + itemsPerPage)
+  }, [sortedFlights, currentPage])
+
   return (
     <div className="scheduled-flights">
       <h2>Scheduled Flights</h2>
@@ -18,15 +39,7 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
             </tr>
           </thead>
           <tbody>
-            {schedules && schedules
-              .slice()
-              .sort((a: any, b: any) => {
-                const ad = a?.datetime || a?.scrapedAt || ''
-                const bd = b?.datetime || b?.scrapedAt || ''
-                return (bd as string).localeCompare(ad as string)
-              })
-              .slice(0, 10)
-              .map((flight, index) => {
+            {paginatedFlights.map((flight, index) => {
               const isHawarden = flight.route?.includes('Hawarden (EGNR)') || flight.airport?.includes('Hawarden')
               return (
                 <tr key={index} className={isHawarden ? 'hawarden-flight' : ''}>
@@ -40,6 +53,49 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
             })}
           </tbody>
         </table>
+        
+        {totalPages > 1 && (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            marginTop: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Previous
+            </button>
+            <span style={{ padding: '0.5rem 1rem' }}>
+              Page {currentPage} of {totalPages} ({sortedFlights.length} flights)
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Last
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

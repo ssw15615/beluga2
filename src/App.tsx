@@ -365,6 +365,27 @@ function App() {
     localStorage.setItem('apiSource', apiSource)
   }, [apiSource])
 
+  // Auto-scrape every 30 minutes
+  useEffect(() => {
+    const autoScrape = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+        await fetch(`${API_URL}/api/scrape`, { method: 'POST' })
+        console.log('[Auto-scrape] Scraped schedule and locations')
+      } catch (e) {
+        console.error('[Auto-scrape] Failed:', e)
+      }
+    }
+
+    // Run immediately on mount
+    autoScrape()
+    
+    // Then run every 30 minutes
+    const interval = setInterval(autoScrape, 30 * 60 * 1000) // 30 minutes
+    
+    return () => clearInterval(interval)
+  }, [])
+
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
   }

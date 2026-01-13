@@ -154,9 +154,9 @@ export async function scrapeSchedule() {
       }
     }
 
-    // Keep only items scraped in the last 24h
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const recent = deduped.filter(f => (f.scrapedAt || '') >= twentyFourHoursAgo);
+    // Keep only items scraped in the last 6 months
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+    const recent = deduped.filter(f => (f.scrapedAt || '') >= sixMonthsAgo);
 
     // Sort by actual flight datetime (desc), fallback to scrapedAt
     recent.sort((a, b) => {

@@ -26,6 +26,8 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [filterAircraft, setFilterAircraft] = useState('')
   const [filterDeparture, setFilterDeparture] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 20
 
   // Get unique values for filters
   const uniqueAircraft = useMemo(() => {
@@ -97,6 +99,18 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
 
     return filtered
   }, [schedules, searchTerm, sortField, sortOrder, filterAircraft, filterDeparture])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredFlights.length / itemsPerPage)
+  const paginatedFlights = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredFlights.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredFlights, currentPage])
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1)
+  }, [searchTerm, filterAircraft, filterDeparture])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -186,8 +200,8 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
             </tr>
           </thead>
           <tbody>
-            {filteredFlights.length > 0 ? (
-              filteredFlights.map((flight, index) => {
+            {paginatedFlights.length > 0 ? (
+              paginatedFlights.map((flight, index) => {
                 const isHawarden = flight.route?.includes('Hawarden (EGNR)') || flight.airport?.includes('Hawarden')
                 const dateTime = [flight.date, flight.time].filter(Boolean).join(' ') || flight.datetime || flight.scrapedAt
                 
@@ -210,6 +224,49 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
             )}
           </tbody>
         </table>
+        
+        {totalPages > 1 && (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            marginTop: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+            >
+              Previous
+            </button>
+            <span style={{ padding: '0.5rem 1rem' }}>
+              Page {currentPage} of {totalPages} ({filteredFlights.length} flights)
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{ padding: '0.5rem 0.75rem', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              Last
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
