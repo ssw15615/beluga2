@@ -272,52 +272,8 @@ function App() {
     }
   }
 
-  const fetchFromADSBExchange = async () => {
-    try {
-      // ADS-B Exchange rapid API - publicly accessible
-      const allPlanes = []
-      for (const reg of BELUGA_REGISTRATIONS) {
-        try {
-          // Use the public lol endpoint with ICAO hex codes
-          // Note: You may need to look up the hex codes for these registrations
-          const response = await fetch(`https://globe.adsbexchange.com/api/v2/registration/${reg}`)
-          if (!response.ok) {
-            console.log(`ADSBX error for ${reg}: ${response.status}`)
-            continue
-          }
-          const data = await response.json()
-          if (data.ac && data.ac.length > 0) {
-            // Convert ADSBX format to match FR24 format
-            const ac = data.ac[0]
-            allPlanes.push({
-              fr24_id: ac.hex || reg,
-              flight: ac.flight?.trim() || reg,
-              callsign: ac.flight?.trim() || '',
-              lat: ac.lat,
-              lon: ac.lon,
-              alt: ac.alt_baro || ac.alt_geom || 0,
-              gspeed: ac.gs || 0,
-              reg: reg,
-              type: 'BelugaXL',
-              orig_iata: '',
-              dest_iata: '',
-              dest_icao: '',
-              heading: ac.track
-            })
-          }
-        } catch (error) {
-          console.error(`Error fetching ${reg} from ADSBX:`, error)
-        }
-      }
-      console.log('ADSBX API response:', allPlanes)
-      setApiStatus(prev => ({ ...prev, adsbx: allPlanes.length > 0 ? true : null }))
-      return allPlanes
-    } catch (error) {
-      console.error('ADS-B Exchange API error:', error)
-      setApiStatus(prev => ({ ...prev, adsbx: false }))
-      throw error
-    }
-  }
+  // Note: ADS-B Exchange API blocks CORS from browsers
+  // Would need to implement a backend proxy to use ADSBX
 
   const fetchLiveData = async (retryCount = 0) => {
     try {
