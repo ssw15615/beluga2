@@ -449,7 +449,7 @@ function App() {
               headers: {
                 'accept': 'application/json',
                 'accept-version': 'v1',
-                'authorization': `Bearer ${API_KEY}`
+                'authorization': `Bearer ${FR24_API_KEY}`
               }
             }
           )
