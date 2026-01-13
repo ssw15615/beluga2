@@ -369,6 +369,21 @@ function App() {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
   }
 
+  const handleLogin = (password: string) => {
+    const correctPassword = import.meta.env.VITE_APP_PASSWORD || 'beluga2026'
+    if (password === correctPassword) {
+      setIsAuthenticated(true)
+      localStorage.setItem('beluga_auth', 'true')
+      return true
+    }
+    return false
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    localStorage.removeItem('beluga_auth')
+  }
+
   // Theme Toggle Component
   const ThemeToggle = () => (
     <button 
