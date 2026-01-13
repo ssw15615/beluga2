@@ -41,6 +41,72 @@ import ScheduledFlights from './components/ScheduledFlights'
 import HistoricFlights from './components/HistoricFlights'
 import './App.css'
 
+// Login Screen Component
+function LoginScreen({ onLogin, theme }: { onLogin: (password: string) => boolean, theme: 'light' | 'dark' }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const success = onLogin(password)
+    if (success) {
+      setError(false)
+    } else {
+      setError(true)
+      setPassword('')
+    }
+  }
+
+  return (
+    <div className={`app ${theme}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div style={{ 
+        background: theme === 'dark' ? '#1e1e1e' : '#ffffff',
+        padding: '2rem',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxWidth: '400px',
+        width: '100%'
+      }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>🛫 Beluga Tracker</h1>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                fontSize: '1rem',
+                borderRadius: '8px',
+                border: error ? '2px solid #ff4444' : '1px solid #ccc',
+                background: theme === 'dark' ? '#2d2d2d' : '#f5f5f5',
+                color: theme === 'dark' ? '#ffffff' : '#000000',
+                outline: 'none'
+              }}
+            />
+            {error && <p style={{ color: '#ff4444', fontSize: '0.875rem', marginTop: '0.5rem' }}>Incorrect password</p>}
+          </div>
+          <button
+            type="submit"
+            className="theme-toggle"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              fontSize: '1rem',
+              cursor: 'pointer'
+            }}
+          >
+            Login
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // Subscribe user to push notifications and send to backend
 function usePushSubscription() {
   useEffect(() => {
@@ -90,7 +156,17 @@ const EGNR_LAT = 53.1744
 const EGNR_LON = -2.9779
 const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
 
-type ApiSource = 'flightradar24' | 'adsbexchange' | 'none'
+type ApiSource = 'flightradar24' | 'opensky' | 'none'
+
+// ICAO hex codes for Beluga registrations (for OpenSky)
+const BELUGA_ICAO_HEX: { [key: string]: string } = {
+  'F-GXLG': '3944ef',
+  'F-GXLH': '3944f0',
+  'F-GXLI': '3944f1',
+  'F-GXLJ': '3944f2',
+  'F-GXLN': '394b4f',
+  'F-GXLO': '394b50'
+}
 
 // Cache helper functions
 const getCacheKey = (reg: string, timestamp: number) => `fr24_history_${reg}_${timestamp}`
@@ -135,6 +211,9 @@ const clearHistoryCache = () => {
 
 function App() {
   usePushSubscription();
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('beluga_auth') === 'true'
+  })
   const [planes, setPlanes] = useState([])
   const [historyHours, setHistoryHours] = useState(48)
   const [historyData, setHistoryData] = useState<{ [reg: string]: any[] }>({})
@@ -144,11 +223,10 @@ function App() {
   })
   const [scrapedData, setScrapedData] = useState<any>({ schedules: [], locations: {} })
   const [apiSource, setApiSource] = useState<ApiSource>(() => {
-    return (localStorage.getItem('apiSource') as ApiSource) || 'none'
+    return (localStorage.getItem('apiSource') as ApiSource) || 'opensky'
   })
-  const [apiStatus, setApiStatus] = useState<{ fr24: boolean | null, adsbx: boolean | null }>({
-    fr24: null,
-    adsbx: null
+  const [apiStatus, setApiStatus] = useState<{ fr24: boolean | null }>({
+    fr24: null
   })
   const [backendApiSource, setBackendApiSource] = useState<'opensky' | 'fr24'>('opensky')
 
@@ -327,6 +405,56 @@ function App() {
     }
   }
 
+  const fetchFromOpenSky = async () => {
+    try {
+      const response = await fetch('https://opensky-network.org/api/states/all')
+      
+      if (!response.ok) {
+        throw new Error(`OpenSky API error: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const planes = []
+      
+      // Filter for our Belugas by ICAO24 hex code
+      const belugaHexCodes = Object.values(BELUGA_ICAO_HEX)
+      for (const state of data.states || []) {
+        const icao24 = state[0]
+        if (belugaHexCodes.includes(icao24)) {
+          // Find registration from hex code
+          const reg = Object.keys(BELUGA_ICAO_HEX).find(key => BELUGA_ICAO_HEX[key] === icao24) || icao24
+          
+          // Only include if plane is on ground (state[8] = true) or in air with valid position
+          if (state[6] !== null && state[5] !== null) {
+            planes.push({
+              fr24_id: icao24,
+              flight: (state[1] || '').trim() || reg,
+              callsign: (state[1] || '').trim(),
+              lat: state[6],
+              lon: state[5],
+              alt: Math.round((state[7] || state[13] || 0)), // baro_altitude or geo_altitude in meters
+              gspeed: Math.round((state[9] || 0) * 1.94384), // velocity m/s to knots
+              reg: reg,
+              type: 'BelugaXL',
+              orig_iata: '',
+              dest_iata: '',
+              dest_icao: '', // OpenSky doesn't provide destination
+              heading: Math.round(state[10] || 0) // true_track
+            })
+          }
+        }
+      }
+      
+      console.log('OpenSky API response:', planes)
+      setApiStatus(prev => ({ ...prev, fr24: null }))
+      return planes
+    } catch (error) {
+      console.error('OpenSky API error:', error)
+      setApiStatus(prev => ({ ...prev, fr24: null }))
+      throw error
+    }
+  }
+
   // Note: ADS-B Exchange API blocks CORS from browsers
   // Would need to implement a backend proxy to use ADSBX
 
@@ -342,7 +470,10 @@ function App() {
       let data
       
       // Try selected API first
-      if (apiSource === 'flightradar24') {
+      if (apiSource === 'opensky') {
+        console.log('Fetching from OpenSky Network...')
+        data = await fetchFromOpenSky()
+      } else if (apiSource === 'flightradar24') {
         try {
           data = await fetchFromFlightRadar24()
         } catch (error) {
@@ -376,6 +507,13 @@ function App() {
   }
 
   const fetchHistoryData = async () => {
+    // Skip history fetching if API is disabled or not FR24 (OpenSky doesn't support historical data)
+    if (apiSource === 'none' || apiSource === 'opensky') {
+      console.log('[fetchHistoryData] Skipped - API disabled or not supported')
+      setHistoryData({})
+      return
+    }
+    
     const now = Math.floor(Date.now() / 1000)
     const newHistory: { [reg: string]: any[] } = {}
     
@@ -509,6 +647,11 @@ function App() {
 
   const flyingToEGNR: Plane | null = planes.find((plane: Plane) => plane.dest_icao === 'EGNR') || null
 
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} theme={theme} />
+  }
+
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <div className="app">
@@ -516,6 +659,16 @@ function App() {
           <h1>Airbus Beluga XL Fleet Tracker</h1>
           <div className="header-buttons">
             <div className="api-selector">
+              <label className="api-label">
+                <input
+                  type="radio"
+                  name="apiSource"
+                  value="opensky"
+                  checked={apiSource === 'opensky'}
+                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                />
+                OpenSky
+              </label>
               <label className="api-label">
                 <span className={`api-status ${apiStatus.fr24 === true ? 'online' : apiStatus.fr24 === false ? 'offline' : 'unknown'}`}>●</span>
                 <input
@@ -526,17 +679,6 @@ function App() {
                   onChange={(e) => setApiSource(e.target.value as ApiSource)}
                 />
                 FR24
-              </label>
-              <label className="api-label">
-                <span className={`api-status ${apiStatus.adsbx === true ? 'online' : apiStatus.adsbx === false ? 'offline' : 'unknown'}`}>●</span>
-                <input
-                  type="radio"
-                  name="apiSource"
-                  value="adsbexchange"
-                  checked={apiSource === 'adsbexchange'}
-                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
-                />
-                ADSBX
               </label>
               <label className="api-label">
                 <input
@@ -575,6 +717,7 @@ function App() {
             </div>
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
             <button onClick={testNotification} className="theme-toggle" title="Send test push notification">🔔 Test Push</button>
+            <button onClick={handleLogout} className="theme-toggle" title="Logout">🚪 Logout</button>
           </div>
         </div>
         <div className="controls">
