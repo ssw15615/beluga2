@@ -199,6 +199,27 @@ function App() {
     }
   }
 
+  const testNotification = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+      const res = await fetch(`${API_URL}/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Test Notification',
+          body: 'Push notifications are working! 🛫',
+          url: '/'
+        })
+      })
+      const data = await res.json()
+      console.log(`Test notification sent to ${data.sent} subscriber(s)`)
+      alert(`Test notification sent to ${data.sent} subscriber(s)`)
+    } catch (e) {
+      console.error('Test notification failed:', e)
+      alert('Test notification failed - check console')
+    }
+  }
+
   useEffect(() => {
     // Data is hardcoded from scraping
   }, [])
@@ -496,6 +517,7 @@ function App() {
             </div>
             <ThemeToggle />
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
+            <button onClick={testNotification} className="theme-toggle" title="Send test push notification">🔔 Test Push</button>
           </div>
         </div>
         <div className="controls">
