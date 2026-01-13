@@ -79,7 +79,7 @@ interface WeatherData {
   clouds: number
 }
 
-const WeatherDisplay = ({ airportCode, lat, lon }: { airportCode: string, lat: number, lon: number }) => {
+const WeatherDisplay = ({ lat, lon }: { lat: number, lon: number }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -168,12 +168,9 @@ const WeatherDisplay = ({ airportCode, lat, lon }: { airportCode: string, lat: n
 
 // Component to track zoom level and update CSS variable
 const ZoomHandler = () => {
-  const [zoom, setZoom] = useState(4)
-  
   const map = useMapEvents({
     zoomend: () => {
       const currentZoom = map.getZoom()
-      setZoom(currentZoom)
       // Calculate scale factor: zoom 4 = 1.0, each zoom level adjusts by ~35%
       const baseZoom = 4
       const scaleFactor = Math.pow(1.35, currentZoom - baseZoom)
@@ -310,7 +307,7 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
                   </div>
                 </div>
                 
-                <WeatherDisplay airportCode={airport.code} lat={airport.lat} lon={airport.lon} />
+                <WeatherDisplay lat={airport.lat} lon={airport.lon} />
                 
                 <div className="airport-planes">
                   <h4>✈️ Beluga XL Planes Present:</h4>
