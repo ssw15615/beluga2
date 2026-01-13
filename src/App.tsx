@@ -402,8 +402,10 @@ function App() {
       <div className="app">
         <div className="header">
           <h1>Airbus Beluga XL Fleet Tracker</h1>
-          <ThemeToggle />
-          <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
+          <div className="header-buttons">
+            <ThemeToggle />
+            <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
+          </div>
         </div>
         <div className="controls">
           <HistorySelector hours={historyHours} onChange={setHistoryHours} />
