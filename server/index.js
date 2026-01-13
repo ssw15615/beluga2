@@ -21,7 +21,19 @@ webpush.setVapidDetails(
   VAPID_PRIVATE_KEY
 );
 
-app.use(cors());
+// Configure CORS to allow Vercel frontend
+const corsOptions = {
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'https://beluga2-ammr.vercel.app',
+    /\.vercel\.app$/  // Allow all Vercel preview deployments
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 // Store subscriptions in memory (for demo); use a DB for production
