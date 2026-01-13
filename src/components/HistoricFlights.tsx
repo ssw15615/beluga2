@@ -189,7 +189,7 @@ const HistoricFlights = ({ schedules = [] }: HistoricFlightsProps) => {
             {filteredFlights.length > 0 ? (
               filteredFlights.map((flight, index) => {
                 const isHawarden = flight.route?.includes('Hawarden (EGNR)') || flight.airport?.includes('Hawarden')
-                const dateTime = flight.datetime || flight.scrapedAt || [flight.date, flight.time].filter(Boolean).join(' ')
+                const dateTime = [flight.date, flight.time].filter(Boolean).join(' ') || flight.datetime || flight.scrapedAt
                 
                 return (
                   <tr key={index} className={isHawarden ? 'hawarden-flight' : ''}>

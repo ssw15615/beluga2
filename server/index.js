@@ -4,9 +4,12 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import fs from 'fs';
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 
 // Load or set your VAPID keys here
 const VAPID_PUBLIC_KEY = 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
@@ -27,7 +30,7 @@ const SUBS_FILE = './subscriptions.json';
 
 // Beluga monitoring state
 const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO'];
-const API_KEY = '019b9077-3179-71c5-a92f-b1879c84889b|TMlN9GK6WOMVo4nBWcR6BBBQRNwMvFzUycKuynx561cf2b00';
+const API_KEY = process.env.FR24_API_KEY;
 let previousActivePlanes = new Set();
 let previousChesterBound = new Set();
 

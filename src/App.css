@@ -203,6 +203,59 @@ body {
   align-items: center;
 }
 
+.api-selector {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-secondary);
+  padding: 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.api-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.api-label:hover {
+  background: var(--bg-tertiary);
+}
+
+.api-label input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.api-label input[type="radio"]:checked + span {
+  color: var(--text-primary);
+}
+
+.api-status {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.api-status.online {
+  color: #4ade80;
+}
+
+.api-status.offline {
+  color: #f87171;
+}
+
+.api-status.unknown {
+  color: #94a3b8;
+}
+
 .theme-toggle {
   background: var(--accent-color);
   color: white;

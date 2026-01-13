@@ -24,7 +24,18 @@ export async function scrapeSchedule() {
         const h = timeParts[0] || 0;
         const min = timeParts[1] || 0;
         if (!isFinite(d) || !isFinite(m)) return null;
-        const dt = new Date(now.getFullYear(), m - 1, d, h, min, 0, 0);
+        
+        // Start with current year
+        let year = now.getFullYear();
+        let dt = new Date(year, m - 1, d, h, min, 0, 0);
+        
+        // If the resulting date is more than 30 days in the future, assume it's from last year
+        const daysDiff = (dt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysDiff > 30) {
+          year--;
+          dt = new Date(year, m - 1, d, h, min, 0, 0);
+        }
+        
         return dt.toISOString();
       } catch {
         return null;

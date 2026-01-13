@@ -1,0 +1,17 @@
+[
+  {
+    "scrapedAt": "2026-01-13T19:18:00.963Z",
+    "date": "13/01",
+    "time": "19:29",
+    "status": "scheduled",
+    "flight": "BGA221H",
+    "route": "Saint Nazaire (LFRZ)",
+    "aircraft": "Beluga XL2",
+    "airport": "Toulouse Blagnac",
+    "icao": "LFBO",
+    "type": "Arrivals",
+    "departure": "Toulouse Blagnac",
+    "arrival": "Saint Nazaire (LFRZ)",
+    "datetime": "2026-01-13T19:29:00.000Z"
+  }
+]

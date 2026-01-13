@@ -13,7 +13,7 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 // TODO: Replace with your backend endpoint and VAPID public key
-const VAPID_PUBLIC_KEY = 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BJX_2b3pWrz3uVgCMpAAbQHIli26GBIpP8ZokX_2aFWbpCe1eDVVbFmqq7CYif9dDRvMfwXNzqW3czJESi0b0rw';
 
 interface Plane {
   fr24_id: string
@@ -85,10 +85,12 @@ const ThemeContext = React.createContext<{
 })
 
 const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO']
-const API_KEY = '019b9077-3179-71c5-a92f-b1879c84889b|TMlN9GK6WOMVo4nBWcR6BBBQRNwMvFzUycKuynx561cf2b00'
+const FR24_API_KEY = import.meta.env.VITE_FR24_API_KEY || ''
 const EGNR_LAT = 53.1744
 const EGNR_LON = -2.9779
 const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
+
+type ApiSource = 'flightradar24' | 'adsbexchange'
 
 // Cache helper functions
 const getCacheKey = (reg: string, timestamp: number) => `fr24_history_${reg}_${timestamp}`
@@ -141,6 +143,13 @@ function App() {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
   })
   const [scrapedData, setScrapedData] = useState<any>({ schedules: [], locations: {} })
+  const [apiSource, setApiSource] = useState<ApiSource>(() => {
+    return (localStorage.getItem('apiSource') as ApiSource) || 'flightradar24'
+  })
+  const [apiStatus, setApiStatus] = useState<{ fr24: boolean | null, adsbx: boolean | null }>({
+    fr24: null,
+    adsbx: null
+  })
 
   // Fetch schedule and location data from backend
   useEffect(() => {
@@ -218,6 +227,11 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
+  // Save API source to localStorage
+  useEffect(() => {
+    localStorage.setItem('apiSource', apiSource)
+  }, [apiSource])
+
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
   }
@@ -233,32 +247,105 @@ function App() {
     </button>
   )
 
-  const fetchLiveData = async (retryCount = 0) => {
+  const fetchFromFlightRadar24 = async () => {
     try {
       const response = await fetch(`https://fr24api.flightradar24.com/api/live/flight-positions/full?registrations=${BELUGA_REGISTRATIONS.join(',')}`, {
         headers: {
           'accept': 'application/json',
           'accept-version': 'v1',
-          'authorization': `Bearer ${API_KEY}`
+          'authorization': `Bearer ${FR24_API_KEY}`
         }
       })
       
-      if (response.status === 429) {
-        // Rate limited, wait and retry
-        const waitTime = Math.min(1000 * Math.pow(2, retryCount), 30000) // Exponential backoff, max 30s
-        console.log(`Rate limited, retrying in ${waitTime}ms...`)
-        setTimeout(() => fetchLiveData(retryCount + 1), waitTime)
-        return
+      if (!response.ok) {
+        throw new Error(`FR24 API error: ${response.status}`)
       }
       
       const data = await response.json()
-      console.log('FR24 API response:', data) // Debug log
-      setPlanes(data.data || [])
+      console.log('FR24 API response:', data)
+      setApiStatus(prev => ({ ...prev, fr24: true }))
+      return data.data || []
     } catch (error) {
-      console.error('Error fetching live data:', error)
-      // Retry on network errors
+      console.error('FlightRadar24 API error:', error)
+      setApiStatus(prev => ({ ...prev, fr24: false }))
+      throw error
+    }
+  }
+
+  const fetchFromADSBExchange = async () => {
+    try {
+      // ADS-B Exchange API - fetch all Belugas
+      const allPlanes = []
+      for (const reg of BELUGA_REGISTRATIONS) {
+        try {
+          const response = await fetch(`https://adsbexchange.com/api/aircraft/v2/registration/${reg}`)
+          if (!response.ok) {
+            throw new Error(`ADSBX API error: ${response.status}`)
+          }
+          const data = await response.json()
+          if (data.ac && data.ac.length > 0) {
+            // Convert ADSBX format to match FR24 format
+            const ac = data.ac[0]
+            allPlanes.push({
+              fr24_id: ac.hex || reg,
+              flight: ac.flight?.trim() || reg,
+              callsign: ac.flight?.trim() || '',
+              lat: ac.lat,
+              lon: ac.lon,
+              alt: ac.alt_baro || ac.alt_geom || 0,
+              gspeed: ac.gs || 0,
+              reg: reg,
+              type: 'BelugaXL',
+              orig_iata: '',
+              dest_iata: '',
+              dest_icao: '',
+              heading: ac.track
+            })
+          }
+        } catch (error) {
+          console.error(`Error fetching ${reg} from ADSBX:`, error)
+        }
+      }
+      console.log('ADSBX API response:', allPlanes)
+      setApiStatus(prev => ({ ...prev, adsbx: true }))
+      return allPlanes
+    } catch (error) {
+      console.error('ADS-B Exchange API error:', error)
+      setApiStatus(prev => ({ ...prev, adsbx: false }))
+      throw error
+    }
+  }
+
+  const fetchLiveData = async (retryCount = 0) => {
+    try {
+      let data
+      
+      // Try selected API first
+      if (apiSource === 'flightradar24') {
+        try {
+          data = await fetchFromFlightRadar24()
+        } catch (error) {
+          console.log('FR24 failed, trying ADSBX...')
+          data = await fetchFromADSBExchange()
+          // Auto-switch to working API
+          setApiSource('adsbexchange')
+        }
+      } else {
+        try {
+          data = await fetchFromADSBExchange()
+        } catch (error) {
+          console.log('ADSBX failed, trying FR24...')
+          data = await fetchFromFlightRadar24()
+          // Auto-switch to working API
+          setApiSource('flightradar24')
+        }
+      }
+      
+      setPlanes(data || [])
+    } catch (error) {
+      console.error('Both APIs failed:', error)
       if (retryCount < 3) {
-        setTimeout(() => fetchLiveData(retryCount + 1), 2000)
+        setTimeout(() => fetchLiveData(retryCount + 1), 5000)
       }
     }
   }
@@ -293,7 +380,7 @@ function App() {
                 headers: {
                   'accept': 'application/json',
                   'accept-version': 'v1',
-                  'authorization': `Bearer ${API_KEY}`
+                  'authorization': `Bearer ${FR24_API_KEY}`
                 }
               }
             )
@@ -403,6 +490,30 @@ function App() {
         <div className="header">
           <h1>Airbus Beluga XL Fleet Tracker</h1>
           <div className="header-buttons">
+            <div className="api-selector">
+              <label className="api-label">
+                <span className={`api-status ${apiStatus.fr24 === true ? 'online' : apiStatus.fr24 === false ? 'offline' : 'unknown'}`}>●</span>
+                <input
+                  type="radio"
+                  name="apiSource"
+                  value="flightradar24"
+                  checked={apiSource === 'flightradar24'}
+                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                />
+                FR24
+              </label>
+              <label className="api-label">
+                <span className={`api-status ${apiStatus.adsbx === true ? 'online' : apiStatus.adsbx === false ? 'offline' : 'unknown'}`}>●</span>
+                <input
+                  type="radio"
+                  name="apiSource"
+                  value="adsbexchange"
+                  checked={apiSource === 'adsbexchange'}
+                  onChange={(e) => setApiSource(e.target.value as ApiSource)}
+                />
+                ADSBX
+              </label>
+            </div>
             <ThemeToggle />
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
           </div>
