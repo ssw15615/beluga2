@@ -13,7 +13,11 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
   const [showModal, setShowModal] = useState(false)
 
   const getXlNum = (reg: string) => {
-    const index = allRegistrations.indexOf(reg)
+    // F-GSTF is Beluga5, not an XL
+    if (reg === 'F-GSTF') return null
+    
+    const xlRegs = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO']
+    const index = xlRegs.indexOf(reg)
     return index >= 0 ? (index + 1).toString() : null
   }
 
@@ -220,14 +224,18 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
                 title="Click for detailed information"
               >
                 <div className="status-item-content">
-                  <span className="reg">{reg} <span className="xl-number">(XL{xlNum})</span></span>
+                  <span className="reg">
+                    {reg} 
+                    {xlNum && <span className="xl-number">(XL{xlNum})</span>}
+                    {reg === 'F-GSTF' && <span className="xl-number">(Beluga5)</span>}
+                  </span>
                   <span className="status">{isActive ? 'Active' : 'Inactive'}</span>
                   <span className="airport">Last Airport: {lastAirport}</span>
                 </div>
                 <div className="status-item-photo">
                   <img
-                    src={`/aircraft-photos/xl${xlNum}.jpg`}
-                    alt={`Beluga XL${xlNum}`}
+                    src={xlNum ? `/aircraft-photos/xl${xlNum}.jpg` : `/aircraft-photos/${reg}.jpg`}
+                    alt={xlNum ? `Beluga XL${xlNum}` : `Beluga ${reg}`}
                     className="status-photo"
                     data-attempt="0"
                     onError={(e) => {
