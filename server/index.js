@@ -46,6 +46,11 @@ const API_KEY = process.env.FR24_API_KEY;
 let previousActivePlanes = new Set();
 let previousChesterBound = new Set();
 
+// Validate environment
+if (!API_KEY) {
+  console.warn('⚠️  FR24_API_KEY not set - live plane tracking will not work');
+}
+
 // Load subscriptions from file if exists
 if (fs.existsSync(SUBS_FILE)) {
   subscriptions = JSON.parse(fs.readFileSync(SUBS_FILE));
