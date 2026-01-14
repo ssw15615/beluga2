@@ -63,6 +63,17 @@ app.get('/', (req, res) => {
 // Store subscriptions in memory (for demo); use a DB for production
 let subscriptions = [];
 const SUBS_FILE = './subscriptions.json';
+const OPENSKY_SCHEDULE_FILE = './openskySchedule.json';
+
+// Airbus airports for schedule tracking
+const AIRBUS_AIRPORTS = [
+  { code: 'LFBO', name: 'Toulouse Blagnac' },
+  { code: 'LFRS', name: 'Nantes Atlantique' },
+  { code: 'EGNR', name: 'Hawarden' },
+  { code: 'LEZL', name: 'Seville' },
+  { code: 'LEMD', name: 'Madrid Barajas' },
+  { code: 'LEBL', name: 'Barcelona' }
+];
 
 // Beluga monitoring state
 const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO', 'F-GSTF'];
@@ -72,6 +83,10 @@ const OPENSKY_CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
 let apiSource = process.env.API_SOURCE || 'opensky'; // 'opensky' or 'fr24'
 let previousActivePlanes = new Set();
 let previousChesterBound = new Set();
+
+// OAuth2 token management for OpenSky
+let openskyAccessToken = null;
+let openskyTokenExpiry = 0;
 
 // Rate limiting for OpenSky API
 let lastOpenSkyCall = 0;
@@ -102,6 +117,16 @@ app.get('/api/schedule', (req, res) => {
     res.json(JSON.parse(data));
   } catch (e) {
     // Return an empty array instead of 404 so the frontend stays alive when no flights are present
+    res.json([]);
+  }
+});
+
+// Serve OpenSky schedule
+app.get('/api/opensky-schedule', (req, res) => {
+  try {
+    const data = fs.readFileSync(OPENSKY_SCHEDULE_FILE);
+    res.json(JSON.parse(data));
+  } catch (e) {
     res.json([]);
   }
 });
@@ -186,11 +211,167 @@ app.post('/api/source', (req, res) => {
   }
 });
 
+// Get live plane positions
+app.get('/api/planes', async (req, res) => {
+  try {
+    let planes = [];
+    
+    if (apiSource === 'opensky') {
+      planes = await fetchFromOpenSky();
+    } else if (apiSource === 'fr24') {
+      planes = await fetchFromFR24();
+    }
+    
+    res.json(planes);
+  } catch (error) {
+    console.error('Error fetching plane data:', error);
+    res.status(500).json({ error: 'Failed to fetch plane data', planes: [] });
+  }
+});
+
+// Get Hawarden (EGNR) arrivals and departures from OpenSky
+app.get('/api/hawarden-flights', async (req, res) => {
+  try {
+    const EGNR_ICAO = 'EGNR';
+    const now = Math.floor(Date.now() / 1000);
+    const dayAgo = now - (24 * 60 * 60); // Last 24 hours
+    
+    // Prepare authentication headers with OAuth2 token
+    const headers = {};
+    if (OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET) {
+      const token = await getOpenskyAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    
+    // Fetch arrivals and departures in parallel
+    const [arrivalsRes, departuresRes] = await Promise.all([
+      fetch(`https://opensky-network.org/api/flights/arrival?airport=${EGNR_ICAO}&begin=${dayAgo}&end=${now}`, { headers }),
+      fetch(`https://opensky-network.org/api/flights/departure?airport=${EGNR_ICAO}&begin=${dayAgo}&end=${now}`, { headers })
+    ]);
+    
+    const arrivals = arrivalsRes.ok ? await arrivalsRes.json() : [];
+    const departures = departuresRes.ok ? await departuresRes.json() : [];
+    
+    // Filter for Beluga flights only
+    const belugaCallsigns = BELUGA_REGISTRATIONS.map(reg => reg.replace('-', ''));
+    const belugaHexCodes = Object.values(BELUGA_ICAO_HEX);
+    
+    const filterBelugas = (flights) => {
+      return (flights || []).filter(flight => {
+        const icao24 = flight.icao24?.toLowerCase();
+        const callsign = flight.callsign?.trim().toUpperCase();
+        return belugaHexCodes.includes(icao24) || 
+               BELUGA_REGISTRATIONS.some(reg => callsign?.includes(reg.replace('-', '')));
+      });
+    };
+    
+    const belugaArrivals = filterBelugas(arrivals);
+    const belugaDepartures = filterBelugas(departures);
+    
+    console.log(`Found ${belugaArrivals.length} Beluga arrivals and ${belugaDepartures.length} departures at EGNR`);
+    
+    res.json({
+      arrivals: belugaArrivals,
+      departures: belugaDepartures,
+      airport: EGNR_ICAO,
+      period: { start: dayAgo, end: now }
+    });
+  } catch (error) {
+    console.error('Error fetching Hawarden flights:', error);
+    res.status(500).json({ error: 'Failed to fetch flights', arrivals: [], departures: [] });
+  }
+});
+
+// Build OpenSky schedule for all Airbus airports
+app.post('/api/build-opensky-schedule', async (req, res) => {
+  try {
+    console.log('Building OpenSky schedule for Airbus airports...');
+    const now = Math.floor(Date.now() / 1000);
+    const daysAgo = now - (7 * 24 * 60 * 60); // Last 7 days
+    
+    // Prepare authentication headers
+    const headers = {};
+    if (OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET) {
+      const token = await getOpenskyAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    
+    const belugaHexCodes = Object.values(BELUGA_ICAO_HEX);
+    const schedule = [];
+    
+    // Fetch arrivals and departures for each airport
+    for (const airport of AIRBUS_AIRPORTS) {
+      console.log(`Fetching flights for ${airport.name} (${airport.code})...`);
+      
+      try {
+        const [arrivalsRes, departuresRes] = await Promise.all([
+          fetch(`https://opensky-network.org/api/flights/arrival?airport=${airport.code}&begin=${daysAgo}&end=${now}`, { headers }),
+          fetch(`https://opensky-network.org/api/flights/departure?airport=${airport.code}&begin=${daysAgo}&end=${now}`, { headers })
+        ]);
+        
+        const arrivals = arrivalsRes.ok ? await arrivalsRes.json() : [];
+        const departures = departuresRes.ok ? await departuresRes.json() : [];
+        
+        // Filter for Beluga flights and process
+        const processFlights = (flights, type) => {
+          return (flights || []).filter(flight => {
+            const icao24 = flight.icao24?.toLowerCase();
+            return belugaHexCodes.includes(icao24);
+          }).map(flight => {
+            const reg = Object.keys(BELUGA_ICAO_HEX).find(key => BELUGA_ICAO_HEX[key] === flight.icao24?.toLowerCase());
+            const departureTime = new Date(flight.firstSeen * 1000);
+            const arrivalTime = new Date(flight.lastSeen * 1000);
+            const duration = Math.round((flight.lastSeen - flight.firstSeen) / 60); // minutes
+            
+            return {
+              type: type,
+              registration: reg || flight.icao24,
+              callsign: flight.callsign?.trim() || '',
+              departure: flight.estDepartureAirport || '',
+              arrival: flight.estArrivalAirport || '',
+              departureTime: departureTime.toISOString(),
+              arrivalTime: arrivalTime.toISOString(),
+              duration: duration,
+              date: departureTime.toISOString().split('T')[0],
+              firstSeen: flight.firstSeen,
+              lastSeen: flight.lastSeen
+            };
+          });
+        };
+        
+        schedule.push(...processFlights(arrivals, 'arrival'));
+        schedule.push(...processFlights(departures, 'departure'));
+        
+        // Rate limiting - wait 2 seconds between airports
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`Error fetching flights for ${airport.code}:`, error);
+      }
+    }
+    
+    // Sort by departure time
+    schedule.sort((a, b) => new Date(b.departureTime) - new Date(a.departureTime));
+    
+    // Save to file
+    fs.writeFileSync(OPENSKY_SCHEDULE_FILE, JSON.stringify(schedule, null, 2));
+    
+    console.log(`✅ OpenSky schedule built with ${schedule.length} flights`);
+    res.json({ success: true, flights: schedule.length, schedule });
+  } catch (error) {
+    console.error('Error building OpenSky schedule:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
   console.log(`API Source: ${apiSource}`);
-  console.log(`OpenSky Auth: ${OPENSKY_CLIENT_ID ? 'Enabled (higher rate limits)' : 'Disabled (anonymous, lower rate limits)'}`);
+  console.log(`OpenSky Auth: ${OPENSKY_CLIENT_ID ? 'Enabled (OAuth2, higher rate limits)' : 'Disabled (anonymous, lower rate limits)'}`);
   
   // Start monitoring Belugas
   console.log('Starting Beluga monitoring for push notifications...');
@@ -198,15 +379,63 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 // ICAO hex codes for Beluga registrations (for OpenSky)
+// ICAO hex codes for Beluga registrations (for OpenSky)
 const BELUGA_ICAO_HEX = {
-  'F-GXLG': '3944ef',
-  'F-GXLH': '3944f0',
-  'F-GXLI': '3944f1',
-  'F-GXLJ': '3944f2',
-  'F-GXLN': '394b4f',
-  'F-GXLO': '394b50',
-  'F-GSTF': '3850d5'
+  'F-GXLG': '395d66', // Beluga XL1
+  'F-GXLH': '395d67', // Beluga XL2 - confirmed with BGA113H callsign
+  'F-GXLI': '395d68', // Beluga XL3
+  'F-GXLJ': '395d69', // Beluga XL4
+  'F-GXLN': '395d6d', // Beluga XL5
+  'F-GXLO': '395d6e', // Beluga XL6
+  'F-GSTF': '3850d5'  // Beluga ST (original)
 };
+
+// Function to get OAuth2 access token for OpenSky
+async function getOpenskyAccessToken() {
+  // Check if we have a valid token
+  if (openskyAccessToken && Date.now() < openskyTokenExpiry) {
+    return openskyAccessToken;
+  }
+
+  if (!OPENSKY_CLIENT_ID || !OPENSKY_CLIENT_SECRET) {
+    return null;
+  }
+
+  try {
+    console.log('Fetching new OpenSky OAuth2 token...');
+    
+    const response = await fetch('https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        'grant_type': 'client_credentials',
+        'client_id': OPENSKY_CLIENT_ID,
+        'client_secret': OPENSKY_CLIENT_SECRET
+      }).toString()
+    });
+
+    if (!response.ok) {
+      console.error('Failed to get OAuth2 token:', response.status, response.statusText);
+      const text = await response.text();
+      console.error('Response:', text);
+      console.log('Falling back to anonymous access');
+      return null;
+    }
+
+    const data = await response.json();
+    openskyAccessToken = data.access_token;
+    // Set expiry to 90% of the actual expiry time to refresh before it expires
+    openskyTokenExpiry = Date.now() + (data.expires_in * 900);
+    console.log('✅ OAuth2 token obtained, expires in', data.expires_in, 'seconds');
+    return openskyAccessToken;
+  } catch (error) {
+    console.error('Error getting OAuth2 token:', error);
+    console.log('Falling back to anonymous access');
+    return null;
+  }
+}
 
 // Function to fetch live Beluga data from OpenSky Network
 async function fetchFromOpenSky() {
@@ -229,12 +458,16 @@ async function fetchFromOpenSky() {
     console.log('Fetching from OpenSky Network...');
     lastOpenSkyCall = now;
     
-    // Prepare authentication headers if credentials available
+    // Prepare authentication headers with OAuth2 token
     const headers = {};
     if (OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET) {
-      const auth = Buffer.from(`${OPENSKY_CLIENT_ID}:${OPENSKY_CLIENT_SECRET}`).toString('base64');
-      headers['Authorization'] = `Basic ${auth}`;
-      console.log('Using authenticated OpenSky API');
+      const token = await getOpenskyAccessToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+        console.log('Using OAuth2 authenticated OpenSky API');
+      } else {
+        console.log('OAuth2 token failed, using anonymous API');
+      }
     } else {
       console.log('Using anonymous OpenSky API (limited rate)');
     }
@@ -260,13 +493,31 @@ async function fetchFromOpenSky() {
     const data = await response.json();
     const planes = [];
     
+    console.log(`OpenSky returned ${data.states?.length || 0} total aircraft states`);
+    console.log('Looking for Beluga hex codes:', Object.values(BELUGA_ICAO_HEX));
+    
     // Filter for our Belugas by ICAO24 hex code
     const belugaHexCodes = Object.values(BELUGA_ICAO_HEX);
+    
+    // Debug: Look for any aircraft with Beluga callsigns (BGA)
+    const belugaCallsigns = (data.states || []).filter(s => {
+      const callsign = (s[1] || '').trim().toUpperCase();
+      return callsign.startsWith('BGA') || callsign.includes('BELUGA');
+    });
+    if (belugaCallsigns.length > 0) {
+      console.log('Found aircraft with BGA callsigns:');
+      belugaCallsigns.forEach(s => {
+        console.log(`  - ICAO: ${s[0]}, Callsign: ${s[1]?.trim()}, Pos: [${s[6]}, ${s[5]}]`);
+      });
+    }
+    
     for (const state of data.states || []) {
       const icao24 = state[0];
       if (belugaHexCodes.includes(icao24)) {
         // Find registration from hex code
         const reg = Object.keys(BELUGA_ICAO_HEX).find(key => BELUGA_ICAO_HEX[key] === icao24);
+        
+        console.log(`✈️  Found Beluga: ${reg} (${icao24}) at [${state[6]}, ${state[5]}]`);
         
         planes.push({
           fr24_id: icao24,
@@ -419,7 +670,7 @@ async function monitorBelugas() {
   
   // Schedule next check with dynamic backoff delay
   const nextCheck = apiSource === 'opensky' ? openskyBackoffDelay : 120000;
-  console.log(`Next monitoring check in ${Math.round(nextCheck / 1000)} seconds (${apiSource === 'opensky' && OPENSKY_CLIENT_ID ? 'authenticated' : 'standard'} mode)`);
+  console.log(`Next monitoring check in ${Math.round(nextCheck / 1000)} seconds (${apiSource === 'opensky' && OPENSKY_CLIENT_ID ? 'OAuth2 authenticated' : 'standard'} mode)`);
   setTimeout(monitorBelugas, nextCheck);
 }
 

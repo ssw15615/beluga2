@@ -159,14 +159,15 @@ const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
 type ApiSource = 'flightradar24' | 'opensky' | 'none'
 
 // ICAO hex codes for Beluga registrations (for OpenSky)
+// ICAO24 hex codes for Mode-S transponders (for OpenSky)
 const BELUGA_ICAO_HEX: { [key: string]: string } = {
-  'F-GXLG': '3944ef',
-  'F-GXLH': '3944f0',
-  'F-GXLI': '3944f1',
-  'F-GXLJ': '3944f2',
-  'F-GXLN': '394b4f',
-  'F-GXLO': '394b50',
-  'F-GSTF': '3850d5'
+  'F-GXLG': '395d66', // Beluga XL1
+  'F-GXLH': '395d67', // Beluga XL2 - confirmed with BGA113H callsign
+  'F-GXLI': '395d68', // Beluga XL3
+  'F-GXLJ': '395d69', // Beluga XL4
+  'F-GXLN': '395d6d', // Beluga XL5
+  'F-GXLO': '395d6e', // Beluga XL6
+  'F-GSTF': '3850d5'  // Beluga ST (original)
 }
 
 // Cache helper functions
@@ -223,6 +224,10 @@ function App() {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
   })
   const [scrapedData, setScrapedData] = useState<any>({ schedules: [], locations: {} })
+  const [openskySchedule, setOpenskySchedule] = useState<any[]>([])
+  const [scheduleSource, setScheduleSource] = useState<'scraper' | 'opensky'>(() => {
+    return (localStorage.getItem('scheduleSource') as 'scraper' | 'opensky') || 'scraper'
+  })
   const [apiSource, setApiSource] = useState<ApiSource>(() => {
     return (localStorage.getItem('apiSource') as ApiSource) || 'opensky'
   })
@@ -238,17 +243,22 @@ function App() {
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
         console.log('Fetching from API_URL:', API_URL)
-        const [scheduleRes, locationsRes] = await Promise.all([
+        const [scheduleRes, locationsRes, openskyScheduleRes] = await Promise.all([
           fetch(`${API_URL}/api/schedule`),
-          fetch(`${API_URL}/api/locations`)
+          fetch(`${API_URL}/api/locations`),
+          fetch(`${API_URL}/api/opensky-schedule`)
         ]);
         console.log('Schedule response status:', scheduleRes.status)
         console.log('Locations response status:', locationsRes.status)
+        console.log('OpenSky schedule response status:', openskyScheduleRes.status)
         const schedules = await scheduleRes.json();
         const locationsData = await locationsRes.json();
+        const openskyScheduleData = await openskyScheduleRes.json();
         console.log('Schedules:', schedules)
         console.log('Locations:', locationsData)
+        console.log('OpenSky schedules:', openskyScheduleData)
         setScrapedData({ schedules, locations: locationsData });
+        setOpenskySchedule(openskyScheduleData);
       } catch (e) {
         console.error('Error fetching data:', e);
       }
@@ -277,6 +287,21 @@ function App() {
       await fetchHistoryData()
     } catch (e) {
       console.error('Scrape failed:', e)
+    }
+  }
+
+  const handleBuildOpenSkySchedule = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+      console.log('Building OpenSky schedule...')
+      const res = await fetch(`${API_URL}/api/build-opensky-schedule`, { method: 'POST' })
+      const data = await res.json()
+      console.log('OpenSky schedule built:', data)
+      if (data.success) {
+        setOpenskySchedule(data.schedule)
+      }
+    } catch (e) {
+      console.error('OpenSky schedule build failed:', e)
     }
   }
 
@@ -367,6 +392,11 @@ function App() {
     localStorage.setItem('apiSource', apiSource)
   }, [apiSource])
 
+  // Save schedule source to localStorage
+  useEffect(() => {
+    localStorage.setItem('scheduleSource', scheduleSource)
+  }, [scheduleSource])
+
   // Auto-scrape every 30 minutes
   useEffect(() => {
     const autoScrape = async () => {
@@ -445,49 +475,19 @@ function App() {
 
   const fetchFromOpenSky = async () => {
     try {
-      const response = await fetch('https://opensky-network.org/api/states/all')
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+      const response = await fetch(`${API_URL}/api/planes`)
       
       if (!response.ok) {
-        throw new Error(`OpenSky API error: ${response.status}`)
+        throw new Error(`API error: ${response.status}`)
       }
       
-      const data = await response.json()
-      const planes = []
-      
-      // Filter for our Belugas by ICAO24 hex code
-      const belugaHexCodes = Object.values(BELUGA_ICAO_HEX)
-      for (const state of data.states || []) {
-        const icao24 = state[0]
-        if (belugaHexCodes.includes(icao24)) {
-          // Find registration from hex code
-          const reg = Object.keys(BELUGA_ICAO_HEX).find(key => BELUGA_ICAO_HEX[key] === icao24) || icao24
-          
-          // Only include if plane is on ground (state[8] = true) or in air with valid position
-          if (state[6] !== null && state[5] !== null) {
-            planes.push({
-              fr24_id: icao24,
-              flight: (state[1] || '').trim() || reg,
-              callsign: (state[1] || '').trim(),
-              lat: state[6],
-              lon: state[5],
-              alt: Math.round((state[7] || state[13] || 0)), // baro_altitude or geo_altitude in meters
-              gspeed: Math.round((state[9] || 0) * 1.94384), // velocity m/s to knots
-              reg: reg,
-              type: 'BelugaXL',
-              orig_iata: '',
-              dest_iata: '',
-              dest_icao: '', // OpenSky doesn't provide destination
-              heading: Math.round(state[10] || 0) // true_track
-            })
-          }
-        }
-      }
-      
-      console.log('OpenSky API response:', planes)
+      const planes = await response.json()
+      console.log('Backend API response:', planes)
       setApiStatus(prev => ({ ...prev, fr24: null }))
       return planes
     } catch (error) {
-      console.error('OpenSky API error:', error)
+      console.error('Backend API error:', error)
       setApiStatus(prev => ({ ...prev, fr24: null }))
       throw error
     }
@@ -775,6 +775,7 @@ function App() {
             <ThemeToggle />
             <button onClick={() => setShowApiSettings(true)} className="theme-toggle" title="Configure API settings">⚙️ API Settings</button>
             <button onClick={handleScrapeNow} className="theme-toggle" title="Scrape schedule & locations now">🔄 Scrape Now</button>
+            <button onClick={handleBuildOpenSkySchedule} className="theme-toggle" title="Build OpenSky schedule from all Airbus airports">📡 Build OpenSky</button>
             <button onClick={testNotification} className="theme-toggle" title="Send test push notification">🔔 Test Push</button>
             <button onClick={handleLogout} className="theme-toggle" title="Logout">🚪 Logout</button>
           </div>
@@ -782,13 +783,24 @@ function App() {
         <div className="controls">
           <HistorySelector hours={historyHours} onChange={setHistoryHours} />
           <ProximityDisplay closest={closestPlane} flyingTo={flyingToEGNR} />
+          <div className="schedule-source-selector" style={{ marginLeft: 'auto' }}>
+            <label style={{ marginRight: '0.5rem', fontWeight: 'bold' }}>Schedule Source:</label>
+            <select 
+              value={scheduleSource} 
+              onChange={(e) => setScheduleSource(e.target.value as 'scraper' | 'opensky')}
+              style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+            >
+              <option value="scraper">Website Scraper</option>
+              <option value="opensky">OpenSky Network</option>
+            </select>
+          </div>
         </div>
         <div className="main">
-          <Map planes={planes} historyData={historyData} scrapedData={scrapedData} />
-          <PlaneList planes={planes} />
+          <Map planes={planes} historyData={historyData} scrapedData={scrapedData} schedules={scheduleSource === 'opensky' ? openskySchedule : scrapedData.schedules || []} />
+          <PlaneList planes={planes} schedules={scheduleSource === 'opensky' ? openskySchedule : scrapedData.schedules || []} />
         </div>
-        <FleetStatus allRegistrations={BELUGA_REGISTRATIONS} activePlanes={planes} scrapedData={scrapedData} historyData={historyData} schedules={scrapedData.schedules || []} />
-        <ScheduledFlights schedules={scrapedData.schedules || []} />
+        <FleetStatus allRegistrations={BELUGA_REGISTRATIONS} activePlanes={planes} scrapedData={scrapedData} historyData={historyData} schedules={scheduleSource === 'opensky' ? openskySchedule : scrapedData.schedules || []} />
+        <ScheduledFlights schedules={scheduleSource === 'opensky' ? openskySchedule : scrapedData.schedules || []} />
         <HistoricFlights schedules={scrapedData.schedules || []} />
       </div>
     </ThemeContext.Provider>

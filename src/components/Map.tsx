@@ -13,6 +13,7 @@ L.Icon.Default.mergeOptions({
 
 const airbusAirports = [
   { code: 'LFBO', name: 'Toulouse Blagnac', lat: 43.6291, lon: 1.3638, type: 'Manufacturing' },
+  { code: 'EDHI', name: 'Hamburg Finkenwerder', lat: 53.5353, lon: 9.8353, type: 'Manufacturing' },
   { code: 'LFRS', name: 'Nantes Atlantique', lat: 47.1532, lon: -1.6107, type: 'Manufacturing' },
   { code: 'EGNR', name: 'Hawarden', lat: 53.1744, lon: -2.9779, type: 'Wing Assembly' },
   { code: 'LEZL', name: 'Seville', lat: 37.4180, lon: -5.8931, type: 'Manufacturing' },
@@ -64,6 +65,7 @@ interface MapProps {
   planes: Plane[]
   historyData: { [reg: string]: any[] }
   scrapedData: { locations: { [key: string]: string } }
+  schedules: any[]
 }
 
 interface WeatherData {
@@ -189,7 +191,7 @@ const ZoomHandler = () => {
   return null
 }
 
-const Map = ({ planes, historyData, scrapedData }: MapProps) => {
+const Map = ({ planes, historyData, scrapedData, schedules }: MapProps) => {
   const historyLines = Object.entries(historyData).map(([reg, positions]) => ({
     reg,
     positions: positions
@@ -256,31 +258,81 @@ const Map = ({ planes, historyData, scrapedData }: MapProps) => {
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
         maxZoom={19}
       />
-      {planes.map(plane => (
-        <Marker key={plane.fr24_id} position={[plane.lat, plane.lon]} icon={createRotatedIcon(plane.heading)}>
-          <Popup>
-            <div className="plane-popup">
-              <div className="plane-popup-header">
-                <h3>{plane.reg}</h3>
-                <span className="plane-type">{plane.type}</span>
+      {planes.map(plane => {
+        // Look up flight info from schedules if not available from live data
+        let fromLocation = plane.orig_iata
+        let toLocation = plane.dest_iata
+        
+        if ((!fromLocation || !toLocation) && plane.callsign && schedules) {
+          // Find all matching flights by callsign
+          const matchingFlights = schedules.filter((s: any) => s.flight === plane.callsign)
+          if (matchingFlights.length > 0) {
+            // Parse timestamps and find the most recent flight that's in the past or present
+            const now = Date.now() / 1000
+            const sortedFlights = matchingFlights
+              .map((f: any) => ({ ...f, timestamp: f.timestamp || 0 }))
+              .filter((f: any) => f.timestamp <= now) // Only past/current flights
+              .sort((a: any, b: any) => b.timestamp - a.timestamp) // Most recent first
+            const relevantFlight = sortedFlights[0] || matchingFlights[0]
+            fromLocation = fromLocation || relevantFlight.departure || relevantFlight.from
+            toLocation = toLocation || relevantFlight.arrival || relevantFlight.to
+          }
+        }
+        
+        // XL number logic (same as FleetStatus)
+        const xlRegs = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO']
+        const xlIndex = xlRegs.indexOf(plane.reg)
+        const xlNum = xlIndex >= 0 ? (xlIndex + 1).toString() : null
+        return (
+          <Marker key={plane.fr24_id} position={[plane.lat, plane.lon]} icon={createRotatedIcon(plane.heading)}>
+            <Popup 
+              maxWidth={224} 
+              className="airport-popup-container"
+              autoPan={true}
+              autoPanPadding={[100, 100]}
+            >
+              <div className="airport-popup">
+                <div className="airport-header">
+                  <h3>✈️ {plane.reg}</h3>
+                  <div className="airport-badge">{plane.type}{xlNum ? ` XL${xlNum}` : ''}</div>
+                </div>
+                <div className="airport-info">
+                  <div className="info-pill">
+                    <span className="info-label">Flight:</span>
+                    <span className="info-value">{plane.flight}</span>
+                  </div>
+                  <div className="info-pill">
+                    <span className="info-label">Callsign:</span>
+                    <span className="info-value">{plane.callsign}</span>
+                  </div>
+                  <div className="info-pill">
+                    <span className="info-label">📍</span>
+                    <span className="info-value">{plane.lat.toFixed(2)}°, {plane.lon.toFixed(2)}°</span>
+                  </div>
+                  <div className="info-pill">
+                    <span className="info-label">Altitude:</span>
+                    <span className="info-value">{plane.alt} ft</span>
+                  </div>
+                  <div className="info-pill">
+                    <span className="info-label">Speed:</span>
+                    <span className="info-value">{plane.gspeed} knots</span>
+                  </div>
+                  {plane.heading && (
+                    <div className="info-pill">
+                      <span className="info-label">Heading:</span>
+                      <span className="info-value">{plane.heading}°</span>
+                    </div>
+                  )}
+                  <div className="info-pill">
+                    <span className="info-label">Route:</span>
+                    <span className="info-value">{fromLocation || 'N/A'} → {toLocation || 'N/A'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="plane-popup-flight">
-                <div className="flight-number">✈️ {plane.flight}</div>
-                <div className="callsign">📡 {plane.callsign}</div>
-              </div>
-              <div className="plane-popup-position">
-                <div className="position">📍 {plane.lat.toFixed(2)}°, {plane.lon.toFixed(2)}°</div>
-                <div className="altitude">⏫ {plane.alt} ft</div>
-                <div className="speed">💨 {plane.gspeed} knots</div>
-              </div>
-              <div className="plane-popup-route">
-                <div className="route">🛫 {plane.orig_iata} → 🛬 {plane.dest_iata}</div>
-                {plane.heading && <div className="heading">🧭 {plane.heading}°</div>}
-              </div>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+            </Popup>
+          </Marker>
+        )
+      })}
       {airbusAirports.map(airport => {
         const planesAtAirport = getPlanesAtAirportFromScraped(airport.code)
         return (

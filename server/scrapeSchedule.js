@@ -124,9 +124,12 @@ export async function scrapeSchedule() {
           airport: airport,
           icao: icao,
           type: type,
-          departure: airport,
-          arrival: route,
+          // For Arrivals: plane is coming FROM route TO airport
+          // For Departures: plane is going FROM airport TO route
+          departure: type === 'Arrivals' ? route : airport,
+          arrival: type === 'Arrivals' ? airport : route,
           datetime: parseDateTime(date, time),
+          timestamp: timestamp,
         };
 
         newFlights.push(flightObj);

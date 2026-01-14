@@ -16,9 +16,10 @@ interface Plane {
 
 interface PlaneListProps {
   planes: Plane[]
+  schedules?: any[]
 }
 
-const PlaneList = ({ planes }: PlaneListProps) => {
+const PlaneList = ({ planes, schedules = [] }: PlaneListProps) => {
   // Create a simple colored rectangle as a data URL
   const createPlaneImage = (reg: string, color: string = '#0066cc') => {
     return `data:image/svg+xml;base64,${btoa(`
@@ -38,7 +39,11 @@ const PlaneList = ({ planes }: PlaneListProps) => {
             <img src={createPlaneImage(plane.reg)} alt={plane.reg} />
             <div className="plane-basic-info">
               <h3>{plane.reg}</h3>
-              <span className="plane-type">✈️ {plane.type}</span>
+              <span className="plane-type">✈️ {plane.type}{(() => {
+                const xlRegs = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO']
+                const xlIndex = xlRegs.indexOf(plane.reg)
+                return xlIndex >= 0 ? (xlIndex + 1) : ''
+              })()}</span>
             </div>
           </div>
           <div className="plane-card-details">
@@ -64,7 +69,26 @@ const PlaneList = ({ planes }: PlaneListProps) => {
             </div>
             <div className="detail-row">
               <span className="label">Route:</span>
-              <span className="value">{plane.orig_iata} → {plane.dest_iata}</span>
+              <span className="value">{(() => {
+                let from = plane.orig_iata
+                let to = plane.dest_iata
+                if ((!from || !to) && plane.callsign && schedules) {
+                  // Find all matching flights by callsign
+                  const matchingFlights = schedules.filter((s: any) => s.flight === plane.callsign)
+                  if (matchingFlights.length > 0) {
+                    // Parse timestamps and find the most recent flight that's in the past or present
+                    const now = Date.now() / 1000
+                    const sortedFlights = matchingFlights
+                      .map((f: any) => ({ ...f, timestamp: f.timestamp || 0 }))
+                      .filter((f: any) => f.timestamp <= now) // Only past/current flights
+                      .sort((a: any, b: any) => b.timestamp - a.timestamp) // Most recent first
+                    const relevantFlight = sortedFlights[0] || matchingFlights[0]
+                    from = from || relevantFlight.departure || relevantFlight.from
+                    to = to || relevantFlight.arrival || relevantFlight.to
+                  }
+                }
+                return `${from || 'N/A'} → ${to || 'N/A'}`
+              })()}</span>
             </div>
           </div>
         </div>

@@ -40,7 +40,24 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
           </thead>
           <tbody>
             {paginatedFlights.map((flight, index) => {
-              const isHawarden = flight.route?.includes('Hawarden (EGNR)') || flight.airport?.includes('Hawarden')
+              const isHawarden = flight.route?.includes('Hawarden (EGNR)') || flight.airport?.includes('Hawarden') || flight.departure === 'EGNR' || flight.arrival === 'EGNR'
+              
+              // Handle OpenSky format
+              if (flight.departureTime && flight.arrivalTime) {
+                const depTime = new Date(flight.departureTime).toLocaleString()
+                const arrTime = new Date(flight.arrivalTime).toLocaleString()
+                return (
+                  <tr key={index} className={isHawarden ? 'hawarden-flight' : ''}>
+                    <td className="flight-number">{flight.callsign || flight.flight || '-'}</td>
+                    <td className="aircraft">{flight.registration || flight.aircraft || '-'}</td>
+                    <td>{depTime} - {arrTime} ({flight.duration}m)</td>
+                    <td className="departure">{flight.departure || '-'}</td>
+                    <td className="arrival">{flight.arrival || '-'}</td>
+                  </tr>
+                )
+              }
+              
+              // Handle scraper format
               return (
                 <tr key={index} className={isHawarden ? 'hawarden-flight' : ''}>
                   <td className="flight-number">{flight.flight}</td>

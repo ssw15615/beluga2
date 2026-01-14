@@ -276,7 +276,8 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
         <div className="plane-modal-overlay" onClick={closeModal}>
           <div className="plane-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{selectedPlane.reg} - Beluga XL{selectedPlane.xlNum}</h2>
+              <h2>{selectedPlane.reg}</h2>
+              <span className="airport-badge" style={{marginLeft: '0.5rem'}}>BelugaXL{selectedPlane.xlNum}</span>
               <button className="close-button" onClick={closeModal}>×</button>
             </div>
 
@@ -342,53 +343,75 @@ const FleetStatus = ({ allRegistrations, activePlanes, scrapedData = {}, history
                   </div>
                 </div>
 
-                {selectedPlane.status === 'active' && (
-                  <>
-                    <div className="detail-section">
-                      <h3>Flight Information</h3>
-                      <div className="detail-grid">
-                        <div className="detail-item">
-                          <span className="label">Flight:</span>
-                          <span className="value">{selectedPlane.flight || 'N/A'}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">Callsign:</span>
-                          <span className="value">{selectedPlane.callsign || 'N/A'}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">From:</span>
-                          <span className="value">{selectedPlane.orig_iata || 'N/A'}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">To:</span>
-                          <span className="value">{selectedPlane.dest_iata || 'N/A'}</span>
+                {selectedPlane.status === 'active' && (() => {
+                  // Look up flight info from schedules if not available from live data
+                  let fromLocation = selectedPlane.orig_iata
+                  let toLocation = selectedPlane.dest_iata
+                  
+                  if ((!fromLocation || !toLocation) && selectedPlane.callsign && schedules) {
+                    // Find all matching flights by callsign
+                    const matchingFlights = schedules.filter((s: any) => s.flight === selectedPlane.callsign)
+                    if (matchingFlights.length > 0) {
+                      // Parse timestamps and find the most recent flight that's in the past or present
+                      const now = Date.now() / 1000
+                      const sortedFlights = matchingFlights
+                        .map((f: any) => ({ ...f, timestamp: f.timestamp || 0 }))
+                        .filter((f: any) => f.timestamp <= now) // Only past/current flights
+                        .sort((a: any, b: any) => b.timestamp - a.timestamp) // Most recent first
+                      const relevantFlight = sortedFlights[0] || matchingFlights[0]
+                      fromLocation = fromLocation || relevantFlight.departure || relevantFlight.from
+                      toLocation = toLocation || relevantFlight.arrival || relevantFlight.to
+                    }
+                  }
+                  
+                  return (
+                    <>
+                      <div className="detail-section">
+                        <h3>Flight Information</h3>
+                        <div className="detail-grid">
+                          <div className="detail-item">
+                            <span className="label">Flight:</span>
+                            <span className="value">{selectedPlane.flight || 'N/A'}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">Callsign:</span>
+                            <span className="value">{selectedPlane.callsign || 'N/A'}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">From:</span>
+                            <span className="value">{fromLocation || 'N/A'}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">To:</span>
+                            <span className="value">{toLocation || 'N/A'}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="detail-section">
-                      <h3>Position & Performance</h3>
-                      <div className="detail-grid">
-                        <div className="detail-item">
-                          <span className="label">Position:</span>
-                          <span className="value">{selectedPlane.lat?.toFixed(2)}°, {selectedPlane.lon?.toFixed(2)}°</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">Altitude:</span>
-                          <span className="value">{selectedPlane.alt} ft</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">Speed:</span>
-                          <span className="value">{selectedPlane.gspeed} knots</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="label">Heading:</span>
-                          <span className="value">{selectedPlane.heading?.toFixed(0)}°</span>
+                      <div className="detail-section">
+                        <h3>Position & Performance</h3>
+                        <div className="detail-grid">
+                          <div className="detail-item">
+                            <span className="label">Position:</span>
+                            <span className="value">{selectedPlane.lat?.toFixed(2)}°, {selectedPlane.lon?.toFixed(2)}°</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">Altitude:</span>
+                            <span className="value">{selectedPlane.alt} ft</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">Speed:</span>
+                            <span className="value">{selectedPlane.gspeed} knots</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="label">Heading:</span>
+                            <span className="value">{selectedPlane.heading?.toFixed(0)}°</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )
+                })()}
 
                 <div className="detail-section">
                   <h3>Location Information</h3>
