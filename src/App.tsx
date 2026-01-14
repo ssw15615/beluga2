@@ -158,17 +158,7 @@ const CACHE_DURATION = 60 * 60 * 1000 // 1 hour in milliseconds
 
 type ApiSource = 'flightradar24' | 'opensky' | 'none'
 
-// ICAO hex codes for Beluga registrations (for OpenSky)
-// ICAO24 hex codes for Mode-S transponders (for OpenSky)
-const BELUGA_ICAO_HEX: { [key: string]: string } = {
-  'F-GXLG': '395d66', // Beluga XL1
-  'F-GXLH': '395d67', // Beluga XL2 - confirmed with BGA113H callsign
-  'F-GXLI': '395d68', // Beluga XL3
-  'F-GXLJ': '395d69', // Beluga XL4
-  'F-GXLN': '395d6d', // Beluga XL5
-  'F-GXLO': '395d6e', // Beluga XL6
-  'F-GSTF': '3850d5'  // Beluga ST (original)
-}
+// ...existing code...
 
 // Cache helper functions
 const getCacheKey = (reg: string, timestamp: number) => `fr24_history_${reg}_${timestamp}`
