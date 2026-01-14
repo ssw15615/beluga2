@@ -206,7 +206,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('beluga_auth') === 'true'
   })
-  const [planes, setPlanes] = useState([])
+  const [planes, setPlanes] = useState<Plane[]>([])
   const [historyHours, setHistoryHours] = useState(48)
   const [historyData, setHistoryData] = useState<{ [reg: string]: any[] }>(() => {
     // Load persisted history from localStorage on mount

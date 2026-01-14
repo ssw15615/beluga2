@@ -212,21 +212,73 @@ app.post('/api/source', (req, res) => {
 });
 
 // Get live plane positions
+// --- Flight history persistence ---
+const HISTORY_FILE = './flightHistory.json';
+const HISTORY_DURATION = 48 * 3600; // 48 hours in seconds
+
+function loadHistory() {
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    }
+  } catch (e) { console.error('Error loading flight history:', e); }
+  return {};
+}
+
+function saveHistory(history) {
+  try {
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history));
+  } catch (e) { console.error('Error saving flight history:', e); }
+}
+
+function updateFlightHistory(planes) {
+  const history = loadHistory();
+  const now = Math.floor(Date.now() / 1000);
+  const cutoff = now - HISTORY_DURATION;
+  for (const plane of planes) {
+    if (!plane.reg || !plane.lat || !plane.lon) continue;
+    const entry = {
+      lat: plane.lat,
+      lon: plane.lon,
+      timestamp: now,
+      alt: plane.alt,
+      heading: plane.heading,
+      flight: plane.flight,
+      callsign: plane.callsign
+    };
+    if (!Array.isArray(history[plane.reg])) history[plane.reg] = [];
+    history[plane.reg] = history[plane.reg].filter(p => p.timestamp >= cutoff);
+    history[plane.reg].push(entry);
+  }
+  saveHistory(history);
+}
+
 app.get('/api/planes', async (req, res) => {
   try {
     let planes = [];
-    
     if (apiSource === 'opensky') {
       planes = await fetchFromOpenSky();
     } else if (apiSource === 'fr24') {
       planes = await fetchFromFR24();
     }
-    
+    updateFlightHistory(planes);
     res.json(planes);
   } catch (error) {
     console.error('Error fetching plane data:', error);
     res.status(500).json({ error: 'Failed to fetch plane data', planes: [] });
   }
+});
+
+// API endpoint to get last 48h of flight history
+app.get('/api/history', (req, res) => {
+  const history = loadHistory();
+  const now = Math.floor(Date.now() / 1000);
+  const cutoff = now - HISTORY_DURATION;
+  const filtered = {};
+  for (const reg in history) {
+    filtered[reg] = history[reg].filter(p => p.timestamp >= cutoff);
+  }
+  res.json(filtered);
 });
 
 // Get Hawarden (EGNR) arrivals and departures from OpenSky
