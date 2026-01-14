@@ -67,9 +67,19 @@ const SUBS_FILE = './subscriptions.json';
 // Beluga monitoring state
 const BELUGA_REGISTRATIONS = ['F-GXLG', 'F-GXLH', 'F-GXLI', 'F-GXLJ', 'F-GXLN', 'F-GXLO', 'F-GSTF'];
 const API_KEY = process.env.FR24_API_KEY;
+const OPENSKY_CLIENT_ID = process.env.OPENSKY_CLIENT_ID;
+const OPENSKY_CLIENT_SECRET = process.env.OPENSKY_CLIENT_SECRET;
 let apiSource = process.env.API_SOURCE || 'opensky'; // 'opensky' or 'fr24'
 let previousActivePlanes = new Set();
 let previousChesterBound = new Set();
+
+// Rate limiting for OpenSky API
+let lastOpenSkyCall = 0;
+const OPENSKY_MIN_INTERVAL = 10000; // 10 seconds minimum between calls
+let openskyBackoffDelay = 60000; // Start with 1 minute (authenticated users have 4000 credits/day)
+let cachedOpenSkyData = [];
+let cacheTimestamp = 0;
+const CACHE_DURATION = 15000; // Cache for 15 seconds (can refresh more often with auth)
 
 // Validate environment
 if (!API_KEY) {
@@ -180,6 +190,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
   console.log(`API Source: ${apiSource}`);
+  console.log(`OpenSky Auth: ${OPENSKY_CLIENT_ID ? 'Enabled (higher rate limits)' : 'Disabled (anonymous, lower rate limits)'}`);
   
   // Start monitoring Belugas
   console.log('Starting Beluga monitoring for push notifications...');
@@ -200,12 +211,51 @@ const BELUGA_ICAO_HEX = {
 // Function to fetch live Beluga data from OpenSky Network
 async function fetchFromOpenSky() {
   try {
-    const response = await fetch('https://opensky-network.org/api/states/all');
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (cachedOpenSkyData.length > 0 && now - cacheTimestamp < CACHE_DURATION) {
+      console.log('Returning cached OpenSky data');
+      return cachedOpenSkyData;
+    }
+    
+    // Enforce minimum interval between API calls
+    const timeSinceLastCall = now - lastOpenSkyCall;
+    if (timeSinceLastCall < OPENSKY_MIN_INTERVAL) {
+      console.log(`Rate limit: waiting ${OPENSKY_MIN_INTERVAL - timeSinceLastCall}ms before next OpenSky call`);
+      return cachedOpenSkyData;
+    }
+    
+    console.log('Fetching from OpenSky Network...');
+    lastOpenSkyCall = now;
+    
+    // Prepare authentication headers if credentials available
+    const headers = {};
+    if (OPENSKY_CLIENT_ID && OPENSKY_CLIENT_SECRET) {
+      const auth = Buffer.from(`${OPENSKY_CLIENT_ID}:${OPENSKY_CLIENT_SECRET}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+      console.log('Using authenticated OpenSky API');
+    } else {
+      console.log('Using anonymous OpenSky API (limited rate)');
+    }
+    
+    const response = await fetch('https://opensky-network.org/api/states/all', { headers });
+    
+    if (response.status === 429) {
+      console.error('OpenSky API rate limit exceeded (429). Using cached data and increasing backoff.');
+      // Exponentially increase backoff, cap at 5 minutes for authenticated users
+      openskyBackoffDelay = Math.min(openskyBackoffDelay * 1.5, 300000);
+      console.log(`Next check in ${Math.round(openskyBackoffDelay / 1000)} seconds`);
+      return cachedOpenSkyData;
+    }
     
     if (!response.ok) {
       console.error('OpenSky API error:', response.status);
-      return [];
+      return cachedOpenSkyData;
     }
+    
+    // Successfully got data - reset backoff to 1 minute for authenticated users
+    openskyBackoffDelay = 60000; // Reset to 1 minute
     
     const data = await response.json();
     const planes = [];
@@ -236,10 +286,15 @@ async function fetchFromOpenSky() {
       }
     }
     
+    // Cache the results
+    cachedOpenSkyData = planes;
+    cacheTimestamp = now;
+    console.log(`Found ${planes.length} active Belugas`);
+    
     return planes;
   } catch (error) {
     console.error('Error fetching from OpenSky:', error);
-    return [];
+    return cachedOpenSkyData;
   }
 }
 
@@ -362,7 +417,9 @@ async function monitorBelugas() {
   previousActivePlanes = currentActivePlanes;
   previousChesterBound = currentChesterBound;
   
-  // Schedule next check in 2 minutes (to respect rate limits)
-  setTimeout(monitorBelugas, 120000); // 2 minutes
+  // Schedule next check with dynamic backoff delay
+  const nextCheck = apiSource === 'opensky' ? openskyBackoffDelay : 120000;
+  console.log(`Next monitoring check in ${Math.round(nextCheck / 1000)} seconds (${apiSource === 'opensky' && OPENSKY_CLIENT_ID ? 'authenticated' : 'standard'} mode)`);
+  setTimeout(monitorBelugas, nextCheck);
 }
 
