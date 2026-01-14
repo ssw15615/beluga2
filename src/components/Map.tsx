@@ -36,12 +36,13 @@ const airportIcon = new L.Icon({
 // Function to create rotated plane icon using plane-logo.png
 const createRotatedIcon = (heading: number | undefined) => {
   const rotation = heading || 0
-  return new L.Icon({
-    iconUrl: '/plane-logo.png',
+  // Use inline style for smooth rotation
+  return new L.DivIcon({
+    html: `<img src='/plane-logo.png' style='width:40px;height:40px;transform:rotate(${rotation}deg);transition:transform 0.2s linear;' />`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -20],
-    className: `plane-icon rotate-${Math.round(rotation / 10) * 10}`
+    className: 'plane-icon'
   })
 }
 
@@ -192,13 +193,26 @@ const ZoomHandler = () => {
 }
 
 const Map = ({ planes, historyData, scrapedData, schedules }: MapProps) => {
-  const historyLines = Object.entries(historyData).map(([reg, positions]) => ({
-    reg,
-    positions: positions
-      .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .map((p: any) => [p.lat, p.lon]),
-    color: 'blue' // Different colors for each
-  }))
+  // Calculate midnight (local) 48 hours ago
+  const now = new Date()
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startTime = midnight.getTime() - 48 * 60 * 60 * 1000 // 48 hours ago at midnight
+
+  // Only show trails for active planes
+  const activeRegs = planes.map(p => p.reg)
+  const historyLines = Object.entries(historyData)
+    .filter(([reg]) => activeRegs.includes(reg))
+    .map(([reg, positions]) => {
+      // Filter positions to last 48h from midnight
+      const filtered = positions
+        .filter((p: any) => new Date(p.timestamp * 1000).getTime() >= startTime)
+        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      return {
+        reg,
+        positions: filtered.map((p: any) => [p.lat, p.lon]),
+        color: 'blue'
+      }
+    })
 
   // Map scraped location data to planes at airports
   const getPlanesAtAirportFromScraped = (airportCode: string) => {

@@ -208,7 +208,14 @@ function App() {
   })
   const [planes, setPlanes] = useState([])
   const [historyHours, setHistoryHours] = useState(48)
-  const [historyData, setHistoryData] = useState<{ [reg: string]: any[] }>({})
+  const [historyData, setHistoryData] = useState<{ [reg: string]: any[] }>(() => {
+    // Load persisted history from localStorage on mount
+    try {
+      const raw = localStorage.getItem('beluga_flight_history')
+      if (raw) return JSON.parse(raw)
+    } catch {}
+    return {}
+  })
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     // Load theme from localStorage or default to dark
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
@@ -357,9 +364,39 @@ function App() {
 
   useEffect(() => {
     fetchLiveData()
-    const interval = setInterval(fetchLiveData, 60000) // Update every 60s (reduced from 20s)
+    const interval = setInterval(fetchLiveData, 60000) // Update every 60s
     return () => clearInterval(interval)
   }, [])
+
+  // Persist flight history for each plane for 48 hours
+  useEffect(() => {
+    if (!planes || planes.length === 0) return
+    const now = Math.floor(Date.now() / 1000)
+    const cutoff = now - 48 * 3600
+    setHistoryData(prev => {
+      const updated: { [reg: string]: any[] } = { ...prev }
+      for (const plane of planes) {
+        if (!plane.reg || !plane.lat || !plane.lon) continue
+        const entry = {
+          lat: plane.lat,
+          lon: plane.lon,
+          timestamp: now,
+          alt: plane.alt,
+          heading: plane.heading,
+          flight: plane.flight,
+          callsign: plane.callsign
+        }
+        const arr = Array.isArray(updated[plane.reg]) ? updated[plane.reg].filter((p: any) => p.timestamp >= cutoff) : []
+        arr.push(entry)
+        updated[plane.reg] = arr
+      }
+      // Persist to localStorage
+      try {
+        localStorage.setItem('beluga_flight_history', JSON.stringify(updated))
+      } catch {}
+      return updated
+    })
+  }, [planes])
 
   useEffect(() => {
     // Don't auto-fetch history on mount to avoid rate limiting

@@ -1,6 +1,6 @@
 [
   {
-    "scrapedAt": "2026-01-14T09:02:20.123Z",
+    "scrapedAt": "2026-01-14T15:05:37.081Z",
     "date": "14/01",
     "time": "19:47",
     "status": "scheduled",
@@ -16,7 +16,7 @@
     "timestamp": "1768420020"
   },
   {
-    "scrapedAt": "2026-01-14T09:02:20.107Z",
+    "scrapedAt": "2026-01-14T15:05:37.065Z",
     "date": "14/01",
     "time": "18:31",
     "status": "scheduled",
@@ -48,7 +48,7 @@
     "timestamp": "1768412220"
   },
   {
-    "scrapedAt": "2026-01-14T09:02:20.110Z",
+    "scrapedAt": "2026-01-14T15:05:37.069Z",
     "date": "14/01",
     "time": "17:25",
     "status": "estimated",
@@ -62,6 +62,22 @@
     "arrival": "Toulouse Blagnac (LFBO)",
     "datetime": "2026-01-14T17:25:00.000Z",
     "timestamp": "1768411500"
+  },
+  {
+    "scrapedAt": "2026-01-14T15:05:37.059Z",
+    "date": "14/01",
+    "time": "17:12",
+    "status": "scheduled",
+    "flight": "BGA145R",
+    "route": "Hawarden (EGNR)",
+    "aircraft": "Beluga XL6",
+    "airport": "Bremen",
+    "icao": "EDDW",
+    "type": "Arrivals",
+    "departure": "Hawarden (EGNR)",
+    "arrival": "Bremen",
+    "datetime": "2026-01-14T17:12:00.000Z",
+    "timestamp": "1768410720"
   },
   {
     "scrapedAt": "2026-01-14T09:02:20.123Z",
@@ -80,6 +96,22 @@
     "timestamp": "1768409160"
   },
   {
+    "scrapedAt": "2026-01-14T15:05:37.080Z",
+    "date": "14/01",
+    "time": "16:18",
+    "status": "scheduled",
+    "flight": "BGA121N",
+    "route": "Saint Nazaire (LFRZ)",
+    "aircraft": "Beluga XL5",
+    "airport": "Toulouse Blagnac",
+    "icao": "LFBO",
+    "type": "Arrivals",
+    "departure": "Saint Nazaire (LFRZ)",
+    "arrival": "Toulouse Blagnac",
+    "datetime": "2026-01-14T16:18:00.000Z",
+    "timestamp": "1768407480"
+  },
+  {
     "scrapedAt": "2026-01-14T09:02:20.106Z",
     "date": "14/01",
     "time": "16:10",
@@ -96,10 +128,26 @@
     "timestamp": "1768407000"
   },
   {
-    "scrapedAt": "2026-01-14T09:02:20.107Z",
+    "scrapedAt": "2026-01-14T15:05:37.061Z",
     "date": "14/01",
     "time": "15:45",
-    "status": "scheduled",
+    "status": "estimated",
+    "flight": "BGA145R",
+    "route": "Bremen (EDDW)",
+    "aircraft": "Beluga XL6",
+    "airport": "Hawarden",
+    "icao": "EGNR",
+    "type": "Departures",
+    "departure": "Hawarden",
+    "arrival": "Bremen (EDDW)",
+    "datetime": "2026-01-14T15:45:00.000Z",
+    "timestamp": "1768405500"
+  },
+  {
+    "scrapedAt": "2026-01-14T15:05:37.065Z",
+    "date": "14/01",
+    "time": "15:45",
+    "status": "estimated",
     "flight": "BGA183G",
     "route": "Nantes Atlantique (LFRS)",
     "aircraft": "Beluga XL1",
@@ -112,7 +160,7 @@
     "timestamp": "1768405500"
   },
   {
-    "scrapedAt": "2026-01-14T09:02:20.114Z",
+    "scrapedAt": "2026-01-14T15:05:37.075Z",
     "date": "14/01",
     "time": "15:40",
     "status": "estimated",
@@ -142,6 +190,22 @@
     "arrival": "Toulouse Blagnac (LFBO)",
     "datetime": "2026-01-14T15:40:00.000Z",
     "timestamp": "1768405200"
+  },
+  {
+    "scrapedAt": "2026-01-14T15:05:37.077Z",
+    "date": "14/01",
+    "time": "15:15",
+    "status": "estimated",
+    "flight": "BGA121N",
+    "route": "Toulouse Blagnac (LFBO)",
+    "aircraft": "Beluga XL5",
+    "airport": "Saint Nazaire",
+    "icao": "LFRZ",
+    "type": "Departures",
+    "departure": "Saint Nazaire",
+    "arrival": "Toulouse Blagnac (LFBO)",
+    "datetime": "2026-01-14T15:15:00.000Z",
+    "timestamp": "1768403700"
   },
   {
     "scrapedAt": "2026-01-14T09:02:20.122Z",
