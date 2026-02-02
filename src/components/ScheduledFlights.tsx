@@ -25,7 +25,7 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
 
   const sortedFlights = useMemo(() => {
     const now = new Date()
-    const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)
+    // Only filter out past flights, show all future flights (no 2-day limit)
     
     return schedules
       .slice()
@@ -41,7 +41,8 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
           return false
         }
         
-        return flightDate >= now && flightDate <= twoDaysFromNow
+        // Only show flights that are in the future
+        return flightDate >= now
       })
       .sort((a: any, b: any) => {
         const ad = a?.datetime || a?.scrapedAt || ''
