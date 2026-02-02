@@ -9,8 +9,25 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
   const itemsPerPage = 20
 
   const sortedFlights = useMemo(() => {
+    const now = new Date()
+    const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)
+    
     return schedules
       .slice()
+      .filter((flight: any) => {
+        let flightDate
+        if (flight.departureTime) {
+          flightDate = new Date(flight.departureTime)
+        } else if (flight.datetime) {
+          flightDate = new Date(flight.datetime)
+        } else if (flight.date) {
+          flightDate = new Date(flight.date)
+        } else {
+          return false
+        }
+        
+        return flightDate >= now && flightDate <= twoDaysFromNow
+      })
       .sort((a: any, b: any) => {
         const ad = a?.datetime || a?.scrapedAt || ''
         const bd = b?.datetime || b?.scrapedAt || ''
