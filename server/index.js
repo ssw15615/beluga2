@@ -419,11 +419,26 @@ app.post('/api/build-opensky-schedule', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Push server running on http://localhost:${PORT}`);
   console.log('VAPID Public Key:', VAPID_PUBLIC_KEY);
   console.log(`API Source: ${apiSource}`);
   console.log(`OpenSky Auth: ${OPENSKY_CLIENT_ID ? 'Enabled (OAuth2, higher rate limits)' : 'Disabled (anonymous, lower rate limits)'}`);
+  
+  // Start auto-scraping
+  console.log('Starting auto-scraping (every hour)...');
+  const { scrapeSchedule, scrapeLocations } = await import('./scrapeSchedule.js');
+  const runScrapers = async () => {
+    try {
+      await scrapeSchedule();
+      await scrapeLocations();
+      console.log('✅ Auto-scrape completed');
+    } catch (error) {
+      console.error('❌ Auto-scrape failed:', error.message);
+    }
+  };
+  await runScrapers(); // Run immediately on startup
+  setInterval(runScrapers, 60 * 60 * 1000); // Then every hour
   
   // Start monitoring Belugas
   console.log('Starting Beluga monitoring for push notifications...');
