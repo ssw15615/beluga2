@@ -1,5 +1,20 @@
 import { useState, useMemo } from 'react'
 
+// Normalize airport names to handle variations like "Hawarden" vs "Hawarden (EGNR)"
+const normalizeAirport = (airport: string) => {
+  if (!airport) return '-'
+  
+  // Extract airport name and code
+  const match = String(airport).match(/^(.+?)\s*(?:\(([A-Z]{4})\))?$/)
+  if (!match) return airport
+  
+  const name = match[1].trim()
+  const code = match[2]
+  
+  // Return standardized format: "Name (CODE)"
+  return code ? `${name} (${code})` : name
+}
+
 interface ScheduledFlightsProps {
   schedules: any[]
 }
@@ -68,8 +83,8 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
                     <td className="flight-number">{flight.callsign || flight.flight || '-'}</td>
                     <td className="aircraft">{flight.registration || flight.aircraft || '-'}</td>
                     <td>{depTime} - {arrTime} ({flight.duration}m)</td>
-                    <td className="departure">{flight.departure || '-'}</td>
-                    <td className="arrival">{flight.arrival || '-'}</td>
+                    <td className="departure">{normalizeAirport(flight.departure || '-')}</td>
+                    <td className="arrival">{normalizeAirport(flight.arrival || '-')}</td>
                   </tr>
                 )
               }
@@ -80,8 +95,8 @@ const ScheduledFlights = ({ schedules = [] }: ScheduledFlightsProps) => {
                   <td className="flight-number">{flight.flight}</td>
                   <td className="aircraft">{flight.aircraft}</td>
                   <td>{[flight.date, flight.time].filter(Boolean).join(' ')}</td>
-                  <td className="departure">{flight.departure || flight.airport}</td>
-                  <td className="arrival">{flight.arrival || flight.route}</td>
+                  <td className="departure">{normalizeAirport(flight.departure || flight.airport)}</td>
+                  <td className="arrival">{normalizeAirport(flight.arrival || flight.route)}</td>
                 </tr>
               )
             })}
